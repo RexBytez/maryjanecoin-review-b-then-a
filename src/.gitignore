@@ -1,0 +1,5 @@
+MaryJaneCoind
+leveldb/build/
+leveldb/libleveldb.a
+leveldb/libmemenv.a
+obj/

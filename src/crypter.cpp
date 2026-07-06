@@ -1,0 +1,128 @@
+#include <openssl/aes.h>
+#include <openssl/evp.h>
+#include <vector>
+#include <string>
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+#include "crypter.h"
+#include "scrypt.h"
+
+bool CCrypter::SetKeyFromPassphrase(const SecureString& strKeyData, const std::vector<unsigned char>& chSalt, const unsigned int nRounds, const unsigned int nDerivationMethod)
+{
+    if (nRounds < 1 || chSalt.size() != WALLET_CRYPTO_SALT_SIZE)
+        return false;
+
+    int i = 0;
+    if (nDerivationMethod == 0)
+    {
+        i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
+                          (unsigned char *)&strKeyData[0], strKeyData.size(), nRounds, vchKey.data(), vchIV.data());
+    }
+
+    if (nDerivationMethod == 1)
+    {
+
+        uint256 scryptHash = scrypt_salted_multiround_hash((const void*)strKeyData.c_str(), strKeyData.size(), &chSalt[0], 8, nRounds);
+
+        i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
+                          (unsigned char *)&scryptHash, sizeof scryptHash, nRounds, vchKey.data(), vchIV.data());
+        OPENSSL_cleanse(&scryptHash, sizeof scryptHash);
+    }
+
+    if (i != (int)WALLET_CRYPTO_KEY_SIZE)
+    {
+        memory_cleanse(vchKey.data(), vchKey.size());
+        memory_cleanse(vchIV.data(), vchIV.size());
+        return false;
+    }
+
+    fKeySet = true;
+    return true;
+}
+
+bool CCrypter::SetKey(const CKeyingMaterial& chNewKey, const std::vector<unsigned char, secure_allocator<unsigned char>>& chNewIV)
+{
+    if (chNewKey.size() != WALLET_CRYPTO_KEY_SIZE || chNewIV.size() != WALLET_CRYPTO_IV_SIZE)
+        return false;
+
+    vchKey = chNewKey;
+    vchIV = chNewIV;
+
+    fKeySet = true;
+    return true;
+}
+
+bool CCrypter::Encrypt(const CKeyingMaterial& vchPlaintext, std::vector<unsigned char> &vchCiphertext)
+{
+    if (!fKeySet)
+        return false;
+
+    int nLen = vchPlaintext.size();
+    int nCLen = nLen + AES_BLOCK_SIZE, nFLen = 0;
+    vchCiphertext = std::vector<unsigned char> (nCLen);
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx)
+        return false;
+
+    bool fOk = true;
+
+    if (fOk) fOk = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, vchKey.data(), vchIV.data());
+    if (fOk) fOk = EVP_EncryptUpdate(ctx, &vchCiphertext[0], &nCLen, &vchPlaintext[0], nLen);
+    if (fOk) fOk = EVP_EncryptFinal_ex(ctx, (&vchCiphertext[0])+nCLen, &nFLen);
+    EVP_CIPHER_CTX_free(ctx);
+
+    if (!fOk) return false;
+
+    vchCiphertext.resize(nCLen + nFLen);
+    return true;
+}
+
+bool CCrypter::Decrypt(const std::vector<unsigned char>& vchCiphertext, CKeyingMaterial& vchPlaintext)
+{
+    if (!fKeySet)
+        return false;
+
+    int nLen = vchCiphertext.size();
+    int nPLen = nLen, nFLen = 0;
+
+    vchPlaintext = CKeyingMaterial(nPLen);
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx)
+        return false;
+
+    bool fOk = true;
+
+    if (fOk) fOk = EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, vchKey.data(), vchIV.data());
+    if (fOk) fOk = EVP_DecryptUpdate(ctx, &vchPlaintext[0], &nPLen, &vchCiphertext[0], nLen);
+    if (fOk) fOk = EVP_DecryptFinal_ex(ctx, (&vchPlaintext[0])+nPLen, &nFLen);
+    EVP_CIPHER_CTX_free(ctx);
+
+    if (!fOk) return false;
+
+    vchPlaintext.resize(nPLen + nFLen);
+    return true;
+}
+
+bool EncryptSecret(const CKeyingMaterial& vMasterKey, const CSecret& vchPlaintext, const uint256& nIV, std::vector<unsigned char>& vchCiphertext)
+{
+    CCrypter cKeyCrypter;
+    std::vector<unsigned char, secure_allocator<unsigned char>> vchIV(WALLET_CRYPTO_IV_SIZE);
+    memcpy(vchIV.data(), nIV.begin(), WALLET_CRYPTO_IV_SIZE);
+    if (!cKeyCrypter.SetKey(vMasterKey, vchIV))
+        return false;
+    return cKeyCrypter.Encrypt((CKeyingMaterial)vchPlaintext, vchCiphertext);
+}
+
+bool DecryptSecret(const CKeyingMaterial& vMasterKey, const std::vector<unsigned char>& vchCiphertext, const uint256& nIV, CSecret& vchPlaintext)
+{
+    CCrypter cKeyCrypter;
+    std::vector<unsigned char, secure_allocator<unsigned char>> vchIV(WALLET_CRYPTO_IV_SIZE);
+    memcpy(vchIV.data(), nIV.begin(), WALLET_CRYPTO_IV_SIZE);
+    if (!cKeyCrypter.SetKey(vMasterKey, vchIV))
+        return false;
+    return cKeyCrypter.Decrypt(vchCiphertext, *((CKeyingMaterial*)&vchPlaintext));
+}

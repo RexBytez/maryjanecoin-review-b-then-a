@@ -1,0 +1,136 @@
+diff --git a/crypto/aes/aes_x86core.c b/crypto/aes/aes_x86core.c
+index b5dd697..eb6f162 100644
+--- a/crypto/aes/aes_x86core.c
++++ b/crypto/aes/aes_x86core.c
+@@ -96,7 +96,7 @@ typedef unsigned long long u64;
+ #elif defined(__GNUC__) && __GNUC__>=2
+ # if defined(__i386) || defined(__i386__) || defined(__x86_64) || defined(__x86_64__)
+ #   define ROTATE(a,n)  ({ register unsigned int ret;   \
+-                asm (           \
++                __asm__ (           \
+                 "roll %1,%0"        \
+                 : "=r"(ret)     \
+                 : "I"(n), "0"(a)    \
+diff --git a/crypto/camellia/camellia.c b/crypto/camellia/camellia.c
+index 719fa61..9627185 100644
+--- a/crypto/camellia/camellia.c
++++ b/crypto/camellia/camellia.c
+@@ -101,21 +101,21 @@
+ #  define PUTU32(p,v) (*((u32 *)(p)) = SWAP((v)))
+ # elif defined(__GNUC__) && __GNUC__>=2
+ #  if defined(__i386) || defined(__x86_64)
+-#   define RightRotate(x,s) ({u32 ret; asm ("rorl %1,%0":"=r"(ret):"I"(s),"0"(x):"cc"); ret; })
+-#   define LeftRotate(x,s)  ({u32 ret; asm ("roll %1,%0":"=r"(ret):"I"(s),"0"(x):"cc"); ret; })
++#   define RightRotate(x,s) ({u32 ret; __asm__ ("rorl %1,%0":"=r"(ret):"I"(s),"0"(x):"cc"); ret; })
++#   define LeftRotate(x,s)  ({u32 ret; __asm__ ("roll %1,%0":"=r"(ret):"I"(s),"0"(x):"cc"); ret; })
+ #   if defined(B_ENDIAN)        /* stratus.com does it */
+ #    define GETU32(p)   (*(u32 *)(p))
+ #    define PUTU32(p,v) (*(u32 *)(p)=(v))
+ #   else
+-#    define GETU32(p)   ({u32 r=*(const u32 *)(p); asm("bswapl %0":"=r"(r):"0"(r)); r; })
+-#    define PUTU32(p,v) ({u32 r=(v); asm("bswapl %0":"=r"(r):"0"(r)); *(u32 *)(p)=r; })
++#    define GETU32(p)   ({u32 r=*(const u32 *)(p); __asm__ ("bswapl %0":"=r"(r):"0"(r)); r; })
++#    define PUTU32(p,v) ({u32 r=(v); __asm__ ("bswapl %0":"=r"(r):"0"(r)); *(u32 *)(p)=r; })
+ #   endif
+ #  elif defined(_ARCH_PPC) || defined(_ARCH_PPC64) || \
+         defined(__powerpc) || defined(__ppc__) || defined(__powerpc64__)
+-#   define LeftRotate(x,s)  ({u32 ret; asm ("rlwinm %0,%1,%2,0,31":"=r"(ret):"r"(x),"I"(s)); ret; })
++#   define LeftRotate(x,s)  ({u32 ret; __asm__ ("rlwinm %0,%1,%2,0,31":"=r"(ret):"r"(x),"I"(s)); ret; })
+ #   define RightRotate(x,s) LeftRotate(x,(32-s))
+ #  elif defined(__s390x__)
+-#   define LeftRotate(x,s)  ({u32 ret; asm ("rll %0,%1,%2":"=r"(ret):"r"(x),"I"(s)); ret; })
++#   define LeftRotate(x,s)  ({u32 ret; __asm__ ("rll %0,%1,%2":"=r"(ret):"r"(x),"I"(s)); ret; })
+ #   define RightRotate(x,s) LeftRotate(x,(32-s))
+ #   define GETU32(p)   (*(u32 *)(p))
+ #   define PUTU32(p,v) (*(u32 *)(p)=(v))
+diff --git a/crypto/sha/sha512.c b/crypto/sha/sha512.c
+index 3bf66ae..e8358da 100644
+--- a/crypto/sha/sha512.c
++++ b/crypto/sha/sha512.c
+@@ -321,13 +321,13 @@ static const SHA_LONG64 K512[80] = {
+ #   if defined(__GNUC__) && __GNUC__>=2 && !defined(OPENSSL_NO_ASM) && !defined(OPENSSL_NO_INLINE_ASM)
+ #    if defined(__x86_64) || defined(__x86_64__)
+ #     define ROTR(a,n)    ({ SHA_LONG64 ret;              \
+-                                asm ("rorq %1,%0"       \
++                                __asm__ ("rorq %1,%0"       \
+                                 : "=r"(ret)             \
+                                 : "J"(n),"0"(a)         \
+                                 : "cc"); ret;           })
+ #     if !defined(B_ENDIAN)
+ #      define PULL64(x) ({ SHA_LONG64 ret=*((const SHA_LONG64 *)(&(x)));  \
+-                                asm ("bswapq    %0"             \
++                                __asm__ ("bswapq    %0"             \
+                                 : "=r"(ret)                     \
+                                 : "0"(ret)); ret;               })
+ #     endif
+@@ -335,7 +335,7 @@ static const SHA_LONG64 K512[80] = {
+ #     if defined(I386_ONLY)
+ #      define PULL64(x) ({ const unsigned int *p=(const unsigned int *)(&(x));\
+                          unsigned int hi=p[0],lo=p[1];          \
+-                                asm("xchgb %%ah,%%al;xchgb %%dh,%%dl;"\
++                                __asm__ ("xchgb %%ah,%%al;xchgb %%dh,%%dl;"\
+                                     "roll $16,%%eax; roll $16,%%edx; "\
+                                     "xchgb %%ah,%%al;xchgb %%dh,%%dl;" \
+                                 : "=a"(lo),"=d"(hi)             \
+@@ -344,25 +344,25 @@ static const SHA_LONG64 K512[80] = {
+ #     else
+ #      define PULL64(x) ({ const unsigned int *p=(const unsigned int *)(&(x));\
+                          unsigned int hi=p[0],lo=p[1];          \
+-                                asm ("bswapl %0; bswapl %1;"    \
++                                __asm__ ("bswapl %0; bswapl %1;"    \
+                                 : "=r"(lo),"=r"(hi)             \
+                                 : "0"(lo),"1"(hi));             \
+                                 ((SHA_LONG64)hi)<<32|lo;        })
+ #     endif
+ #    elif (defined(_ARCH_PPC) && defined(__64BIT__)) || defined(_ARCH_PPC64)
+ #     define ROTR(a,n)    ({ SHA_LONG64 ret;              \
+-                                asm ("rotrdi %0,%1,%2"  \
++                                __asm__ ("rotrdi %0,%1,%2"  \
+                                 : "=r"(ret)             \
+                                 : "r"(a),"K"(n)); ret;  })
+ #    elif defined(__aarch64__)
+ #     define ROTR(a,n)    ({ SHA_LONG64 ret;              \
+-                                asm ("ror %0,%1,%2"     \
++                                __asm__ ("ror %0,%1,%2"     \
+                                 : "=r"(ret)             \
+                                 : "r"(a),"I"(n)); ret;  })
+ #     if  defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+         __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
+ #      define PULL64(x)   ({ SHA_LONG64 ret;                      \
+-                                asm ("rev       %0,%1"          \
++                                __asm__ ("rev       %0,%1"          \
+                                 : "=r"(ret)                     \
+                                 : "r"(*((const SHA_LONG64 *)(&(x))))); ret;             })
+ #     endif
+diff --git a/crypto/whrlpool/wp_block.c b/crypto/whrlpool/wp_block.c
+index 920430b..4d7c8c0 100644
+--- a/crypto/whrlpool/wp_block.c
++++ b/crypto/whrlpool/wp_block.c
+@@ -90,7 +90,7 @@ typedef unsigned long long u64;
+ #elif defined(__GNUC__) && __GNUC__>=2
+ # if defined(__x86_64) || defined(__x86_64__)
+ #  if defined(L_ENDIAN)
+-#   define ROTATE(a,n)       ({ u64 ret; asm ("rolq %1,%0"   \
++#   define ROTATE(a,n)       ({ u64 ret; __asm__ ("rolq %1,%0"   \
+                                    : "=r"(ret) : "J"(n),"0"(a) : "cc"); ret; })
+ #  elif defined(B_ENDIAN)
+        /*
+@@ -100,15 +100,15 @@ typedef unsigned long long u64;
+         * won't do same for x86_64? Naturally no. And this line is waiting
+         * ready for that brave soul:-)
+         */
+-#   define ROTATE(a,n)       ({ u64 ret; asm ("rorq %1,%0"   \
++#   define ROTATE(a,n)       ({ u64 ret; __asm__ ("rorq %1,%0"   \
+                                    : "=r"(ret) : "J"(n),"0"(a) : "cc"); ret; })
+ #  endif
+ # elif defined(__ia64) || defined(__ia64__)
+ #  if defined(L_ENDIAN)
+-#   define ROTATE(a,n)       ({ u64 ret; asm ("shrp %0=%1,%1,%2"     \
++#   define ROTATE(a,n)       ({ u64 ret; __asm__ ("shrp %0=%1,%1,%2"     \
+                                    : "=r"(ret) : "r"(a),"M"(64-(n))); ret; })
+ #  elif defined(B_ENDIAN)
+-#   define ROTATE(a,n)       ({ u64 ret; asm ("shrp %0=%1,%1,%2"     \
++#   define ROTATE(a,n)       ({ u64 ret; __asm__ ("shrp %0=%1,%1,%2"     \
+                                    : "=r"(ret) : "r"(a),"M"(n)); ret; })
+ #  endif
+ # endif

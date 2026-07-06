@@ -1,0 +1,64 @@
+description "MaryJaneCoin Core Daemon"
+
+start on runlevel [2345]
+stop on starting rc RUNLEVEL=[016]
+
+env MARYJANECOIND_BIN="/usr/local/bin/MaryJaneCoind"
+env MARYJANECOIND_USER="maryjanecoin"
+env MARYJANECOIND_GROUP="maryjanecoin"
+env MARYJANECOIND_PIDDIR="/var/run/MaryJaneCoind"
+# upstart can't handle variables constructed with other variables
+env MARYJANECOIND_PIDFILE="/var/run/MaryJaneCoind/MaryJaneCoind.pid"
+env MARYJANECOIND_CONFIGFILE="/etc/MaryJaneCoin/MaryJaneCoin.conf"
+env MARYJANECOIND_DATADIR="/var/lib/MaryJaneCoind"
+
+expect fork
+
+respawn
+respawn limit 5 120
+kill timeout 60
+
+pre-start script
+    # this will catch non-existent config files
+    # MaryJaneCoind will check and exit with this very warning, but it can do so
+    # long after forking, leaving upstart to think everything started fine.
+    # since this is a commonly encountered case on install, just check and
+    # warn here.
+    if ! grep -qs '^rpcpassword=' "$MARYJANECOIND_CONFIGFILE" ; then
+        echo "ERROR: You must set a secure rpcpassword to run MaryJaneCoind."
+        echo "The setting must appear in $MARYJANECOIND_CONFIGFILE"
+        echo
+        echo "This password is security critical to securing wallets "
+        echo "and must not be the same as the rpcuser setting."
+        echo "You can generate a suitable random password using the following "
+        echo "command from the shell:"
+        echo
+        echo "bash -c 'tr -dc a-zA-Z0-9 < /dev/urandom | head -c32 && echo'"
+        echo
+        echo "It is recommended that you also set alertnotify so you are "
+        echo "notified of problems:"
+        echo
+        echo "ie: alertnotify=echo %%s | mail -s \"MaryJaneCoin Alert\"" \
+            "admin@foo.com"
+        echo
+        exit 1
+    fi
+
+    mkdir -p "$MARYJANECOIND_PIDDIR"
+    chmod 0755 "$MARYJANECOIND_PIDDIR"
+    chown $MARYJANECOIND_USER:$MARYJANECOIND_GROUP "$MARYJANECOIND_PIDDIR"
+    chown $MARYJANECOIND_USER:$MARYJANECOIND_GROUP "$MARYJANECOIND_CONFIGFILE"
+    chmod 0660 "$MARYJANECOIND_CONFIGFILE"
+end script
+
+exec start-stop-daemon \
+    --start \
+    --pidfile "$MARYJANECOIND_PIDFILE" \
+    --chuid $MARYJANECOIND_USER:$MARYJANECOIND_GROUP \
+    --exec "$MARYJANECOIND_BIN" \
+    -- \
+    -pid="$MARYJANECOIND_PIDFILE" \
+    -conf="$MARYJANECOIND_CONFIGFILE" \
+    -datadir="$MARYJANECOIND_DATADIR" \
+    -disablewallet \
+    -daemon

@@ -1,0 +1,784 @@
+/**
+ * Modern MaryJaneCoin Qt Theme - Material Design 3
+ * Based on Google Material Design 3 principles
+ * Clean, modern, professional look
+ * 
+ * Design Principles:
+ * - Light background with subtle elevation
+ * - Material Design 3 color palette
+ * - Generous spacing and rounded corners
+ * - Subtle shadows for depth
+ * - High contrast for accessibility
+ */
+
+/** [VARS]
+	$md-surface = #ffffff
+	$md-surface-variant = #f5f5f5
+	$md-background = #fafafa
+	$md-primary = #6750a4
+	$md-primary-container = #eaddff
+	$md-on-primary = #ffffff
+	$md-on-primary-container = #21005d
+	$md-secondary = #625b71
+	$md-secondary-container = #e8def8
+	$md-on-secondary = #ffffff
+	$md-on-secondary-container = #1d192b
+	$md-tertiary = #7d5260
+	$md-error = #ba1a1a
+	$md-error-container = #ffdad6
+	$md-on-error = #ffffff
+	$md-on-error-container = #410002
+	$md-success = #2e7d32
+	$md-success-container = #c8e6c9
+	$md-warning = #f57c00
+	$md-warning-container = #ffe0b2
+	$md-outline = #79747e
+	$md-outline-variant = #cac4d0
+	$md-shadow = rgba(0, 0, 0, 0.15)
+	$md-shadow-elevated = rgba(0, 0, 0, 0.25)
+	$text-primary = #1c1b1f
+	$text-secondary = #49454f
+	$text-disabled = #cac4d0
+	$text-on-primary = #ffffff
+	$text-on-error = #ffffff
+	$spacing-xs = 4px
+	$spacing-sm = 8px
+	$spacing-md = 12px
+	$spacing-lg = 16px
+	$spacing-xl = 24px
+	$spacing-xxl = 32px
+	$radius-xs = 4px
+	$radius-sm = 8px
+	$radius-md = 12px
+	$radius-lg = 16px
+	$radius-xl = 28px
+	$elevation-0 = 1px solid rgba(0, 0, 0, 0.05)
+	$elevation-1 = 1px solid rgba(0, 0, 0, 0.08)
+	$elevation-2 = 1px solid rgba(0, 0, 0, 0.12)
+[/VARS] */
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+
+QMainWindow, QDialog, QFrame {
+	color: $text-primary;
+	background: $md-background;
+	border: none;
+}
+
+QWidget {
+	color: $text-primary;
+	background: $md-background;
+	selection-background-color: $md-primary-container;
+	selection-color: $md-on-primary-container;
+	outline: 0;
+	font-size: 14px;
+}
+
+QWidget:item:selected {
+	color: $text-on-primary;
+	background: $md-primary;
+}
+
+/* ============================================
+   FRAMES AND CARDS
+   ============================================ */
+
+QFrame#frame, QFrame#frame_2 {
+	background: $md-surface;
+	border: $elevation-1;
+	border-radius: $radius-md;
+	padding: $spacing-lg;
+}
+
+QLabel {
+	background: transparent;
+	color: $text-primary;
+}
+
+QLabel[error="true"], QLabel[status="error"] {
+	color: $md-error;
+}
+
+QLabel[ok="true"], QLabel[status="ok"] {
+	color: $md-success;
+}
+
+/* ============================================
+   MENU BAR
+   ============================================ */
+
+QMenuBar {
+	color: $text-primary;
+	background: $md-surface;
+	border: none;
+	border-bottom: $elevation-0;
+	padding: $spacing-xs 0;
+}
+
+QMenuBar::item {
+	background: transparent;
+	border: none;
+	border-radius: $radius-xs;
+	margin: $spacing-xs $spacing-sm;
+	padding: $spacing-sm $spacing-md;
+}
+
+QMenuBar::item:selected {
+	background: $md-primary-container;
+	color: $md-on-primary-container;
+}
+
+QMenuBar::item:pressed {
+	background: $md-primary;
+	color: $text-on-primary;
+}
+
+QMenu {
+	color: $text-primary;
+	background: $md-surface;
+	border: $elevation-2;
+	border-radius: $radius-md;
+	padding: $spacing-sm;
+	min-width: 200px;
+}
+
+QMenu::item {
+	color: $text-primary;
+	background: transparent;
+	border: none;
+	border-radius: $radius-xs;
+	padding: $spacing-sm $spacing-lg;
+	margin: $spacing-xs 0;
+	min-width: 150px;
+}
+
+QMenu::item:selected { 
+	color: $md-on-primary-container;
+	background: $md-primary-container;
+}
+
+QMenu::separator {
+	height: 1px;
+	background: $md-outline-variant;
+	margin: $spacing-sm 0;
+}
+
+/* ============================================
+   TOOLBAR
+   ============================================ */
+
+QToolBar {
+	background: $md-surface;
+	qproperty-iconSize: 24px 24px;
+	qproperty-toolButtonStyle: ToolButtonTextBesideIcon;
+	border: none;
+	border-bottom: $elevation-0;
+	padding: $spacing-md;
+	spacing: $spacing-sm;
+}
+
+QToolBar::handle {
+	padding: 0px;
+	background-repeat: repeat-y;
+	background-position: top center;
+}
+
+QToolButton {
+	color: $text-primary;
+	background: transparent;
+	qproperty-toolButtonStyle: ToolButtonTextBesideIcon;
+	border: none;
+	border-radius: $radius-md;
+	padding: $spacing-sm $spacing-md;
+	margin: $spacing-xs;
+	min-height: 40px;
+	min-width: 64px;
+	font-weight: 500;
+}
+
+QToolButton:hover {
+	color: $md-on-primary-container;
+	background: $md-primary-container;
+}
+
+QToolButton:checked {
+	color: $text-on-primary;
+	background: $md-primary;
+}
+
+QToolButton:pressed {
+	background: $md-primary;
+	color: $text-on-primary;
+	opacity: 0.9;
+}
+
+QToolButton:disabled {
+	color: $text-disabled;
+	background: transparent;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+QPushButton {
+	color: $text-on-primary;
+	background: $md-primary;
+	border: none;
+	border-radius: $radius-xl;
+	padding: $spacing-md $spacing-xl;
+	margin: $spacing-xs;
+	min-height: 40px;
+	font-weight: 500;
+	font-size: 14px;
+}
+
+QPushButton:hover {
+	background: $md-primary;
+	opacity: 0.92;
+}
+
+QPushButton:pressed {
+	background: $md-primary;
+	opacity: 0.84;
+}
+
+QPushButton:disabled {
+	color: $text-disabled;
+	background: $md-surface-variant;
+	opacity: 1.0;
+}
+
+QPushButton:flat {
+	border: none;
+	background: transparent;
+	color: $md-primary;
+}
+
+QPushButton:flat:hover {
+	background: $md-primary-container;
+	color: $md-on-primary-container;
+}
+
+QPushButton:flat:pressed {
+	background: $md-primary-container;
+	opacity: 0.84;
+}
+
+/* ============================================
+   INPUT FIELDS
+   ============================================ */
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QDateTimeEdit, QPlainTextEdit, QTextEdit {
+	color: $text-primary;
+	background: $md-surface;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-xs;
+	padding: $spacing-md;
+	min-height: 40px;
+	selection-background-color: $md-primary;
+	selection-color: $text-on-primary;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, 
+QDateTimeEdit:focus, QPlainTextEdit:focus, QTextEdit:focus {
+	color: $text-primary;
+	background: $md-surface;
+	border: 2px solid $md-primary;
+	padding: 11px;
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, 
+QDateTimeEdit:disabled {
+	color: $text-disabled;
+	background: $md-surface-variant;
+	border-color: $md-outline-variant;
+}
+
+QValidatedLineEdit[error="true"], QDoubleSpinBox[error="true"] {
+	border-color: $md-error;
+	background: $md-error-container;
+	color: $md-on-error-container;
+}
+
+QValidatedLineEdit[error="true"]:focus, QDoubleSpinBox[error="true"]:focus {
+	border-color: $md-error;
+	border-width: 2px;
+	padding: 11px;
+}
+
+/* ============================================
+   COMBOBOX
+   ============================================ */
+
+QComboBox {
+	color: $text-primary;
+	background: $md-surface;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-xs;
+	padding: $spacing-md;
+	padding-right: 40px;
+	min-height: 40px;
+}
+
+QComboBox:hover {
+	border-color: $md-outline;
+}
+
+QComboBox:focus {
+	border-color: $md-primary;
+	border-width: 2px;
+	padding-right: 38px;
+}
+
+QComboBox:disabled {
+	color: $text-disabled;
+	background: $md-surface-variant;
+}
+
+QComboBox::drop-down {
+	border: none;
+	width: 32px;
+	border-top-right-radius: $radius-xs;
+	border-bottom-right-radius: $radius-xs;
+}
+
+QComboBox::down-arrow {
+	image: url($themes-dir/Default/arrow-down.png);
+	width: 16px;
+	height: 16px;
+}
+
+QComboBox QAbstractItemView {
+	background: $md-surface;
+	border: $elevation-2;
+	border-radius: $radius-md;
+	padding: $spacing-xs;
+	selection-background-color: $md-primary-container;
+	selection-color: $md-on-primary-container;
+	outline: none;
+}
+
+QComboBox QAbstractItemView::item {
+	padding: $spacing-md;
+	border-radius: $radius-xs;
+	margin: 2px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+	background: $md-primary-container;
+}
+
+QComboBox QAbstractItemView::item:selected {
+	background: $md-primary-container;
+	color: $md-on-primary-container;
+}
+
+/* ============================================
+   CHECKBOX & RADIO BUTTON
+   ============================================ */
+
+QCheckBox, QRadioButton {
+	color: $text-primary;
+	spacing: $spacing-md;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+	background: $md-surface;
+	border: 2px solid $md-outline;
+	border-radius: 2px;
+	width: 20px;
+	height: 20px;
+}
+
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {
+	border-color: $md-primary;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+	background: $md-primary;
+	border-color: $md-primary;
+	image: url($themes-dir/Default/cb-checked.png);
+}
+
+QCheckBox::indicator:checked:hover, QRadioButton::indicator:checked:hover {
+	background: $md-primary;
+	opacity: 0.92;
+}
+
+QRadioButton::indicator {
+	border-radius: 10px;
+}
+
+QRadioButton::indicator:checked {
+	border-radius: 10px;
+}
+
+/* ============================================
+   TAB WIDGET
+   ============================================ */
+
+QTabWidget {
+	background: transparent;
+}
+
+QTabWidget::pane {
+	background: $md-surface;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-md;
+	padding: $spacing-lg;
+}
+
+QTabBar {
+	background: transparent;
+}
+
+QTabBar::tab {
+	color: $text-secondary;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	padding: $spacing-md $spacing-lg;
+	margin-right: $spacing-xs;
+	min-width: 80px;
+}
+
+QTabBar::tab:hover {
+	color: $text-primary;
+	border-bottom-color: $md-outline;
+}
+
+QTabBar::tab:selected {
+	color: $md-primary;
+	background: transparent;
+	border-bottom-color: $md-primary;
+	font-weight: 600;
+}
+
+/* ============================================
+   TABLES & LIST VIEWS
+   ============================================ */
+
+QTableView, QTreeView, QListView, CoinControlTreeWidget {
+	color: $text-primary;
+	background: $md-surface;
+	alternate-background-color: $md-surface-variant;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-md;
+	gridline-color: $md-outline-variant;
+	outline: none;
+	selection-background-color: $md-primary-container;
+	selection-color: $md-on-primary-container;
+}
+
+QTableView::item, QTreeView::item, QListView::item {
+	padding: $spacing-sm;
+	border: none;
+}
+
+QTableView::item:hover, QTreeView::item:hover, QListView::item:hover {
+	background: $md-primary-container;
+	color: $md-on-primary-container;
+}
+
+QTableView::item:selected, QTreeView::item:selected, QListView::item:selected {
+	background: $md-primary;
+	color: $text-on-primary;
+}
+
+QTableView::item:focus, QTreeView::item:focus {
+	outline: none;
+}
+
+QHeaderView {
+	background: $md-surface-variant;
+	border: none;
+	border-bottom: 1px solid $md-outline-variant;
+}
+
+QHeaderView::section {
+	color: $text-secondary;
+	background: $md-surface-variant;
+	border: none;
+	border-right: 1px solid $md-outline-variant;
+	padding: $spacing-md;
+	font-weight: 600;
+	min-height: 40px;
+}
+
+QHeaderView::section:first {
+	border-top-left-radius: $radius-md;
+}
+
+QHeaderView::section:last {
+	border-top-right-radius: $radius-md;
+	border-right: none;
+}
+
+QHeaderView::section:hover {
+	background: $md-surface;
+}
+
+/* ============================================
+   SCROLLBARS
+   ============================================ */
+
+QScrollBar:vertical {
+	background: $md-surface-variant;
+	width: 12px;
+	border: none;
+	border-radius: 6px;
+	margin: 0;
+}
+
+QScrollBar::handle:vertical {
+	background: $md-outline-variant;
+	border: none;
+	border-radius: 6px;
+	min-height: 40px;
+	margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+	background: $md-outline;
+}
+
+QScrollBar::handle:vertical:pressed {
+	background: $md-primary;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+	height: 0px;
+	width: 0px;
+}
+
+QScrollBar:horizontal {
+	background: $md-surface-variant;
+	height: 12px;
+	border: none;
+	border-radius: 6px;
+	margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+	background: $md-outline-variant;
+	border: none;
+	border-radius: 6px;
+	min-width: 40px;
+	margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+	background: $md-outline;
+}
+
+QScrollBar::handle:horizontal:pressed {
+	background: $md-primary;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+	height: 0px;
+	width: 0px;
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+
+QProgressBar {
+	color: $text-on-primary;
+	background: $md-surface-variant;
+	border: none;
+	border-radius: $radius-xs;
+	text-align: center;
+	height: 32px;
+	padding: 0px;
+}
+
+QProgressBar::chunk {
+	background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+	                            stop: 0 $md-primary, stop: 1 $md-secondary);
+	border-radius: $radius-xs;
+}
+
+/* ============================================
+   STATUS BAR
+   ============================================ */
+
+QStatusBar {
+	background: $md-surface;
+	border: none;
+	border-top: $elevation-0;
+	padding: $spacing-sm;
+}
+
+QStatusBar::item {
+	border: none;
+}
+
+/* ============================================
+   TOOLTIPS
+   ============================================ */
+
+QToolTip {
+	color: $text-on-primary;
+	background: $md-primary;
+	border: none;
+	border-radius: $radius-xs;
+	padding: $spacing-sm $spacing-md;
+	font-size: 12px;
+}
+
+/* ============================================
+   GROUP BOX
+   ============================================ */
+
+QGroupBox {
+	color: $text-primary;
+	font-weight: 600;
+	font-size: 14px;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-md;
+	padding: $spacing-lg $spacing-md $spacing-md;
+	margin-top: $spacing-lg;
+	background: $md-surface;
+}
+
+QGroupBox::title {
+	subcontrol-origin: margin;
+	subcontrol-position: top left;
+	left: $spacing-md;
+	padding: 0 $spacing-sm;
+	background: $md-background;
+	color: $text-primary;
+}
+
+/* ============================================
+   SPECIAL WIDGETS
+   ============================================ */
+
+/* Statistics, BlockBrowser, ChatWindow headings */
+#StatisticsPage #label_5, #BlockBrowser #label_5,
+#ChatWindowClass #label_social, #ChatWindowClass #label_irc, 
+#ChatWindowClass #label_exchanges, #charityDialog #label {
+	color: $md-primary;
+	background: transparent;
+	font-size: 20px;
+	font-weight: 600;
+	margin-bottom: $spacing-md;
+}
+
+/* Charity Dialog */
+#charityAddressEdit, #charityPercentEdit {
+	color: $text-primary;
+	font-size: 14px;
+	font-weight: 400;
+	background: $md-surface;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-xs;
+	padding: $spacing-md;
+}
+
+#charityAddressEdit:focus, #charityPercentEdit:focus {
+	border-width: 2px;
+	border-color: $md-primary;
+	padding: 11px;
+}
+
+/* Calendar Widget */
+QCalendarWidget {
+	background: $md-surface;
+	border: 1px solid $md-outline-variant;
+	border-radius: $radius-md;
+}
+
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+	background: $md-surface-variant;
+	border-bottom: 1px solid $md-outline-variant;
+	border-top-left-radius: $radius-md;
+	border-top-right-radius: $radius-md;
+}
+
+QCalendarWidget QAbstractItemView:enabled {
+	color: $text-primary;
+	background: $md-surface;
+	selection-background-color: $md-primary;
+	selection-color: $text-on-primary;
+}
+
+QCalendarWidget QAbstractItemView:disabled {
+	color: $text-disabled;
+	background: $md-surface-variant;
+}
+
+/* Size Grip */
+QSizeGrip {
+	image: url($themes-dir/Default/resize.png);
+	width: 16px;
+	height: 16px;
+}
+
+/* ============================================
+   LIST WIDGET (Transaction List)
+   ============================================ */
+
+QListView {
+	outline: none;
+	background: $md-surface;
+}
+
+QListView::item {
+	padding: $spacing-md;
+	border-radius: $radius-xs;
+	margin: 2px 0;
+}
+
+QListView::item:hover {
+	background: $md-primary-container;
+	color: $md-on-primary-container;
+}
+
+QListView::item:selected {
+	background: $md-primary;
+	color: $text-on-primary;
+}
+
+/* ============================================
+   LINE (Separator)
+   ============================================ */
+
+QFrame[frameShape="4"] {
+	/* Horizontal Line */
+	color: $md-outline-variant;
+	max-height: 1px;
+	background: $md-outline-variant;
+	border: none;
+}
+
+/* ============================================
+   DIALOG SPECIFIC
+   ============================================ */
+
+QDialog {
+	background: $md-background;
+}
+
+QDialog QLabel {
+	color: $text-primary;
+}
+
+/* Success/Error states */
+QLabel[status="success"] {
+	color: $md-success;
+}
+
+QLabel[status="warning"] {
+	color: $md-warning;
+}
+
+/* Disabled state */
+QWidget:disabled {
+	color: $text-disabled;
+}

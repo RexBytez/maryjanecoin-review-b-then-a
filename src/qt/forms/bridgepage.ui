@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BridgePage</class>
+ <widget class="QWidget" name="BridgePage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Bridge</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="pageTitle">
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; font-weight:600;&quot;&gt;MaryJaneCoin ↔ Solana Bridge&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+    </widget>
+   </item>
+   <!-- Hidden legacy elements -->
+   <item>
+    <widget class="QGroupBox" name="configGroupBox">
+     <property name="title">
+      <string>Bridge Configuration</string>
+     </property>
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <layout class="QFormLayout" name="configFormLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="serverUrlLabel">
+        <property name="text">
+         <string>Bridge Server URL:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="serverUrlEdit"/>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="saveConfigButton">
+        <property name="text">
+         <string>Save Configuration</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="statusGroupBox">
+     <property name="title">
+      <string>Bridge Status</string>
+     </property>
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <layout class="QGridLayout" name="statusGridLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="statusLabel">
+        <property name="text">
+         <string>Bridge Status:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="maryjanecoinBlockLabel">
+        <property name="text">
+         <string>-</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="solanaSlotLabel">
+        <property name="text">
+         <string>-</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="maryjanecoinBalanceLabel">
+        <property name="text">
+         <string>-</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="solanaBalanceLabel">
+        <property name="text">
+         <string>-</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLabel" name="wpotSupplyLabel">
+        <property name="text">
+         <string>-</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <!-- Direction Toggle Buttons -->
+   <item>
+    <layout class="QHBoxLayout" name="directionButtonsLayout">
+     <item>
+      <widget class="QPushButton" name="potToSolButton">
+       <property name="text">
+        <string>MARYJ → Solana</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+       <property name="autoExclusive">
+        <bool>true</bool>
+       </property>
+       <property name="minimumHeight">
+        <number>40</number>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="solToPotButton">
+       <property name="text">
+        <string>Solana → MARYJ</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="autoExclusive">
+        <bool>true</bool>
+       </property>
+       <property name="minimumHeight">
+        <number>40</number>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <!-- Stacked Widget for Direction Content -->
+   <item>
+    <widget class="QStackedWidget" name="directionStack">
+     <!-- Page 0: POT to Solana -->
+     <widget class="QWidget" name="potToSolPage">
+      <layout class="QVBoxLayout" name="potToSolLayout">
+       <item>
+        <widget class="QGroupBox" name="transferGroupBox">
+         <property name="title">
+          <string>Send MARYJ Mainchain → Receive SPL MARYJ on Solana</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="amountLabel">
+            <property name="text">
+             <string>MARYJ Amount:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="amountEdit">
+            <property name="placeholderText">
+             <string>Enter amount (minimum 100 MARYJ)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="destinationLabel">
+            <property name="text">
+             <string>Solana Address:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="destinationAddressEdit">
+            <property name="placeholderText">
+             <string>Enter your Solana wallet address</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="initiateButton">
+            <property name="text">
+             <string>Bridge MARYJ → Solana</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QLabel" name="infoLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-size:9pt; font-style:italic;'&gt;Fee: 0.5% or $4.20 min (auto-sold for SOL escrow gas) · Minimum: 100 MARYJ · 10 confirmations required&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <!-- Page 1: Solana to POT -->
+     <widget class="QWidget" name="solToPotPage">
+      <layout class="QVBoxLayout" name="solToPotLayout">
+       <item>
+        <widget class="QGroupBox" name="receiveGroupBox">
+         <property name="title">
+          <string>Send SPL MARYJ on Solana → Receive MARYJ on Mainchain</string>
+         </property>
+         <layout class="QVBoxLayout" name="receiveLayout">
+          <item>
+           <widget class="QLabel" name="warningLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-weight:600; color:#4ade80;'&gt;✅ EASIEST: Use &lt;a href='https://bridge.maryjanecoin.net' style='color:#9945ff;'&gt;bridge.maryjanecoin.net&lt;/a&gt; — connect Phantom or Solflare and it handles everything automatically.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style='font-size:9pt; color:#999;'&gt;Manual option below if you prefer Trust Wallet (only wallet that supports the memo field natively).&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="openExternalLinks">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="step1Label">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-weight:600;'&gt;Manual steps:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style='font-weight:600;'&gt;1.&lt;/span&gt; Open Trust Wallet and import SPL MARYJ token:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="tokenInfoLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p style='margin-left:20px; font-size:9pt;'&gt;Token Mint: &lt;b&gt;TBD&lt;/b&gt;&lt;br/&gt;Name: MaryJaneCoin (SPL MARYJ) · Decimals: 8&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="textInteractionFlags">
+             <set>Qt::TextSelectableByMouse</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="step2Label">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-weight:600;'&gt;2.&lt;/span&gt; Send SPL MARYJ to this escrow address:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="escrowLayout">
+            <item>
+             <widget class="QLineEdit" name="escrowAddressEdit">
+              <property name="text">
+               <string>SPoto81vBGGkUxUHjxyGQEtGoUsKBQZjpKaA2uj8Gvf</string>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="copyEscrowButton">
+              <property name="text">
+               <string>Copy</string>
+              </property>
+              <property name="maximumWidth">
+               <number>60</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="step3Label">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-weight:600;'&gt;3.&lt;/span&gt; In the MEMO field, enter your MaryJaneCoin mainchain address with prefix:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="memoLayout">
+            <item>
+             <widget class="QLineEdit" name="memoEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+              <property name="placeholderText">
+               <string>Select address below</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="copyMemoButton">
+              <property name="text">
+               <string>Copy</string>
+              </property>
+              <property name="maximumWidth">
+               <number>60</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="addressSelectLayout">
+            <item>
+             <widget class="QLabel" name="yourAddressLabel">
+              <property name="text">
+               <string>Your MaryJaneCoin Address:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="potAddressCombo">
+              <property name="minimumWidth">
+               <number>350</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="exampleLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-size:9pt; color:#666666;'&gt;Example memo: MARYJ:MXy7mH3jR9vKdNdk31BG1LYNzKn69abcde&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="feeInfoLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-size:9pt; font-style:italic;'&gt;Fee: 0.5% or $4.20 min (auto-sold for SOL escrow gas) · ~30 Solana confirmations · MARYJ sent within minutes&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <!-- Hidden legacy combo box -->
+   <item>
+    <widget class="QLabel" name="directionLabelText">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QComboBox" name="directionComboBox">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+   <!-- Transfer History (hidden) -->
+   <item>
+    <widget class="QGroupBox" name="historyGroupBox">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <property name="title">
+      <string>Transfer History</string>
+     </property>
+     <layout class="QVBoxLayout" name="historyVerticalLayout">
+      <item>
+       <widget class="QPushButton" name="refreshButton">
+        <property name="visible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="transfersTable">
+        <property name="visible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

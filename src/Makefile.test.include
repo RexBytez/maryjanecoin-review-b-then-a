@@ -1,0 +1,30 @@
+# Test executable
+if ENABLE_TESTS
+
+test_maryjanecoin_SOURCES = \
+  test/test_bitcoin.cpp \
+  test/block_signature_tests.cpp \
+  test/transaction_record_tests.cpp
+
+test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test
+test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+test_maryjanecoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(PTHREAD_FLAGS)
+
+test_maryjanecoin_LDADD = \
+  $(LIBBITCOIN_SERVER) \
+  $(maryjanecoin_bin_ldadd) \
+  $(top_srcdir)/depends/x86_64-pc-linux-gnu/lib/libboost_unit_test_framework-mt-x64.a
+
+if TARGET_WINDOWS
+test_maryjanecoin_SOURCES += test/test_bitcoin-res.rc
+endif
+
+if TARGET_LINUX
+test_maryjanecoin_LDADD += -lrt
+endif
+
+check_PROGRAMS += test_maryjanecoin
+TESTS += test_maryjanecoin
+
+endif # ENABLE_TESTS
+

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+export LC_ALL=C
+set -e -o pipefail
+
+# Set JOBS before sourcing prelude
+export JOBS="${JOBS:-$(nproc)}"
+
+source "$(dirname "${BASH_SOURCE[0]}")/libexec/prelude.bash"
+
+export HOST="x86_64-apple-darwin"
+export SOURCES_PATH=$PWD/depends/sources
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}"
+
+# Function from guix-build
+profiledir_for_host() {
+    echo "${PROFILES_BASE}/${1}${2:+-${2}}"
+}
+
+time-machine shell --manifest="${PWD}/contrib/guix/manifest.scm" \
+                  --container \
+                  --pure \
+                  --no-cwd \
+                  --share="$PWD"=/maryjanecoin \
+                  --share="$DISTSRC_BASE"=/distsrc-base \
+                  --share="$OUTDIR_BASE"=/outdir-base \
+                  --expose="$(git rev-parse --git-common-dir)" \
+                  ${SOURCES_PATH:+--share="$SOURCES_PATH"} \
+                  ${BASE_CACHE:+--share="$BASE_CACHE"} \
+                  ${SDK_PATH:+--share="$SDK_PATH"} \
+                  --link-profile \
+                  --root="$(profiledir_for_host "${HOST}")" \
+                  ${ADDITIONAL_GUIX_COMMON_FLAGS} ${ADDITIONAL_GUIX_ENVIRONMENT_FLAGS} \
+                  -- env HOST="$HOST" \
+                     DISTNAME="$DISTNAME" \
+                     JOBS="$JOBS" \
+                     SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+                     DISTSRC="/distsrc-base/distsrc-${VERSION}-${HOST}" \
+                     OUTDIR="/outdir-base/$HOST" \
+                     DIST_ARCHIVE_BASE=/outdir-base/dist-archive \
+                     bash -c "
+                        # First set up essential symlinks
+                        [ -e /usr/bin ] || mkdir -p /usr/bin
+                        [ -e /usr/bin/file ] || ln -s --no-dereference \$(command -v file) /usr/bin/file
+                        [ -e /usr/bin/env ] || ln -s --no-dereference \$(command -v env) /usr/bin/env
+                        
+                        # Now run your debug script
+                        cd /maryjanecoin && bash contrib/guix/libexec/debug-build.sh
+                     "

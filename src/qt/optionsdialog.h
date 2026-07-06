@@ -1,0 +1,63 @@
+#ifndef OPTIONSDIALOG_H
+#define OPTIONSDIALOG_H
+
+#if defined(HAVE_CONFIG_H)
+#include <config/bitcoin-config.h>
+#endif
+
+#include <QDialog>
+
+namespace Ui {
+class OptionsDialog;
+}
+class OptionsModel;
+class MonitoredDataMapper;
+class QValidatedLineEdit;
+
+class OptionsDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    explicit OptionsDialog(QWidget *parent = 0);
+    ~OptionsDialog();
+
+    void setModel(OptionsModel *model);
+    void setMapper();
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event);
+
+private Q_SLOTS:
+
+    void enableApplyButton();
+
+    void disableApplyButton();
+
+    void enableSaveButtons();
+
+    void disableSaveButtons();
+
+    void setSaveButtonState(bool fState);
+    void on_okButton_clicked();
+    void on_cancelButton_clicked();
+    void on_applyButton_clicked();
+
+    void showRestartWarning_Proxy();
+    void showRestartWarning_Lang();
+    void updateDisplayUnit();
+    void handleProxyIpValid(QValidatedLineEdit *object, bool fState);
+
+Q_SIGNALS:
+    void proxyIpValid(QValidatedLineEdit *object, bool fValid);
+
+private:
+    Ui::OptionsDialog *ui;
+    OptionsModel *model;
+    MonitoredDataMapper *mapper;
+    bool fRestartWarningDisplayed_Proxy;
+    bool fRestartWarningDisplayed_Lang;
+    bool fProxyIpValid;
+};
+
+#endif
