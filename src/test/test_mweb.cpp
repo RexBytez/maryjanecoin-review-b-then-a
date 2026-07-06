@@ -658,6 +658,94 @@ BOOST_AUTO_TEST_CASE(test_mw_block_serialization)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(mweb_graphnorm_tests)
+
+static bool SameNormalizedGraph(const mw::CMWTransactionBody& a,
+                                const mw::CMWTransactionBody& b)
+{
+    if (a.vInputs.size()  != b.vInputs.size())  return false;
+    if (a.vOutputs.size() != b.vOutputs.size()) return false;
+    if (a.vKernels.size() != b.vKernels.size()) return false;
+    for (size_t i = 0; i < a.vInputs.size(); i++)
+        if (memcmp(a.vInputs[i].commitment.data, b.vInputs[i].commitment.data,
+                   mw::COMMITMENT_SIZE) != 0) return false;
+    for (size_t i = 0; i < a.vOutputs.size(); i++)
+        if (memcmp(a.vOutputs[i].commitment.data, b.vOutputs[i].commitment.data,
+                   mw::COMMITMENT_SIZE) != 0) return false;
+    for (size_t i = 0; i < a.vKernels.size(); i++)
+        if (!(a.vKernels[i].GetHash() == b.vKernels[i].GetHash())) return false;
+    return true;
+}
+
+BOOST_AUTO_TEST_CASE(test_graphnorm_order_carries_zero_information)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+
+    std::vector<mw::Commitment> outs;
+    mw::CMWTransactionBody base;
+    for (int i = 0; i < 4; i++) { mw::Commitment c = FreshCommit(100 + i); outs.push_back(c); base.vOutputs.push_back(MakeOutput(c)); }
+    for (int i = 0; i < 3; i++) base.vInputs.push_back(MakeInput(FreshCommit(500 + i)));
+    for (int i = 0; i < 3; i++)
+    {
+        mw::CMWKernel k = MakeKernel(mw::KERNEL_PLAIN, 10 + i);
+        k.excess = ped.CommitBlind(ped.GenerateBlindingFactor());
+        base.vKernels.push_back(k);
+    }
+
+    mw::CMWTransactionBody ref = base;
+    ref.Sort();
+    BOOST_REQUIRE(ref.IsCanonicallyOrdered());
+
+    std::vector<int> idx;
+    for (int i = 0; i < 4; i++) idx.push_back(i);
+
+    int nPerms = 0;
+    do {
+        mw::CMWTransactionBody perm = base;
+        perm.vOutputs.clear();
+        for (size_t k = 0; k < idx.size(); k++) perm.vOutputs.push_back(MakeOutput(outs[idx[k]]));
+
+        std::rotate(perm.vInputs.begin(),  perm.vInputs.begin()  + (nPerms % perm.vInputs.size()),  perm.vInputs.end());
+        std::rotate(perm.vKernels.begin(), perm.vKernels.begin() + (nPerms % perm.vKernels.size()), perm.vKernels.end());
+
+        perm.Sort();
+        BOOST_REQUIRE(perm.IsCanonicallyOrdered());
+        BOOST_REQUIRE(SameNormalizedGraph(perm, ref));
+        nPerms++;
+    } while (std::next_permutation(idx.begin(), idx.end()));
+
+    BOOST_CHECK_EQUAL(nPerms, 24);
+}
+
+BOOST_AUTO_TEST_CASE(test_graphnorm_kernels_now_sorted)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::CMWTransactionBody b;
+    for (int i = 0; i < 5; i++)
+    {
+        mw::CMWKernel k = MakeKernel(mw::KERNEL_PLAIN, 10 + i);
+        k.excess = ped.CommitBlind(ped.GenerateBlindingFactor());
+        b.vKernels.push_back(k);
+    }
+    b.Sort();
+    BOOST_REQUIRE(b.IsCanonicallyOrdered());
+    for (size_t i = 1; i < b.vKernels.size(); i++)
+        BOOST_CHECK(!(b.vKernels[i].GetHash() < b.vKernels[i - 1].GetHash()));
+}
+
+BOOST_AUTO_TEST_CASE(test_graphnorm_rejects_unsorted)
+{
+    mw::CMWTransactionBody b;
+    for (int i = 0; i < 4; i++) b.vOutputs.push_back(MakeOutput(FreshCommit(700 + i)));
+    b.Sort();
+    BOOST_REQUIRE(b.IsCanonicallyOrdered());
+
+    std::swap(b.vOutputs.front(), b.vOutputs.back());
+    BOOST_CHECK(!b.IsCanonicallyOrdered());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE(mweb_canon_tests)
 
 BOOST_AUTO_TEST_CASE(test_canon_honest_excess_still_verifies)

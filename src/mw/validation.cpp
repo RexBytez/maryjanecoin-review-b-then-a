@@ -30,6 +30,7 @@ std::string CMWValidationResult::ToString() const
         case MW_ERR_INFLATION:           str += "inflation detected"; break;
         case MW_ERR_DUPLICATE_OUTPUT:    str += "duplicate output"; break;
         case MW_ERR_EMPTY_BLOCK:         str += "empty block"; break;
+        case MW_ERR_NONCANONICAL_ORDER:  str += "non-canonical component order"; break;
         default: str += "unknown error"; break;
     }
 
@@ -163,6 +164,13 @@ CMWValidationResult ValidateMWBlock(
     {
         result.error = MW_ERR_PREV_BLOCK_MISMATCH;
         result.strMessage = "previous MW block hash mismatch";
+        return result;
+    }
+
+    if (!block.body.IsCanonicallyOrdered())
+    {
+        result.error = MW_ERR_NONCANONICAL_ORDER;
+        result.strMessage = "MWEB block components not in canonical (sorted) order";
         return result;
     }
 

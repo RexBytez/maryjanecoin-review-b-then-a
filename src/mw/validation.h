@@ -26,6 +26,7 @@ enum MWValidationError
     MW_ERR_INFLATION            = 12,
     MW_ERR_DUPLICATE_OUTPUT     = 13,
     MW_ERR_EMPTY_BLOCK          = 14,
+    MW_ERR_NONCANONICAL_ORDER   = 15,
 };
 
 struct CMWValidationResult

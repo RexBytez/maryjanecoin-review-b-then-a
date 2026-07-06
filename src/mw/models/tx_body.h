@@ -36,6 +36,24 @@ public:
     {
         std::sort(vInputs.begin(), vInputs.end());
         std::sort(vOutputs.begin(), vOutputs.end());
+        std::sort(vKernels.begin(), vKernels.end(),
+                  [](const CMWKernel& a, const CMWKernel& b) {
+                      return a.GetHash() < b.GetHash();
+                  });
+    }
+
+    bool IsCanonicallyOrdered() const
+    {
+        for (size_t i = 1; i < vInputs.size(); i++)
+            if (vInputs[i] < vInputs[i - 1])
+                return false;
+        for (size_t i = 1; i < vOutputs.size(); i++)
+            if (vOutputs[i] < vOutputs[i - 1])
+                return false;
+        for (size_t i = 1; i < vKernels.size(); i++)
+            if (vKernels[i].GetHash() < vKernels[i - 1].GetHash())
+                return false;
+        return true;
     }
 
     int64_t GetTotalFee() const
