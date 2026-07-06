@@ -601,6 +601,10 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
         }
     }
 
+    if (!CheckCanonicalStructure(tx, nBestHeight))
+        return error("CTxMemPool::accept() : transaction %s rejected: "
+            "non-canonical structure (L5 graph normalization)", tx.GetHash().ToString().c_str());
+
     if ((int64_t)tx.nLockTime > std::numeric_limits<int>::max())
         return error("CTxMemPool::accept() : not accepting nLockTime beyond 2038 yet");
 
@@ -1629,6 +1633,17 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                     tx.GetHash().ToString().c_str(), pindex->nHeight,
                     RING_MIXING_MIN_EQUAL_OUTPUTS, nMaxEqual));
             }
+        }
+    }
+
+    if (pindex->nHeight >= L5_GRAPH_NORM_ACTIVATION_HEIGHT)
+    {
+        for (unsigned int i = 0; i < vtx.size(); i++)
+        {
+            if (!CheckCanonicalStructure(vtx[i], pindex->nHeight))
+                return DoS(100, error("ConnectBlock() : transaction %s at height %d "
+                    "rejected: non-canonical structure (L5 graph normalization)",
+                    vtx[i].GetHash().ToString().c_str(), pindex->nHeight));
         }
     }
 

@@ -70,6 +70,9 @@ static const int RING_MIXING_MIN_EQUAL_OUTPUTS = 3;
 
 static const int TWO_POOL_ACTIVATION_HEIGHT = 2000;
 
+static const int L5_GRAPH_NORM_ACTIVATION_HEIGHT = 60000;
+static const unsigned int CANONICAL_OPRETURN_LEN = 35;
+
 enum PoolType {
     POOL_TRANSPARENT = 0,
     POOL_SHIELDED = 1,
@@ -768,6 +771,24 @@ inline int64_t GetTxTypeFeeFloor(const CTransaction& tx, int nHeight)
     if (HasStealthMarker(tx))
         return MARYJ_STANDARD_FEE;
     return MARYJ_DECOY_FEE;
+}
+
+inline bool CheckCanonicalStructure(const CTransaction& tx, int nHeight)
+{
+    if (nHeight < L5_GRAPH_NORM_ACTIVATION_HEIGHT)
+        return true;
+    if (tx.IsCoinBase() || tx.IsCoinStake() || HasPegoutMarker(tx))
+        return true;
+    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    {
+        const CScript& spk = tx.vout[i].scriptPubKey;
+        if (spk.size() >= 1 && spk[0] == 0x6a)
+        {
+            if (spk.size() != CANONICAL_OPRETURN_LEN)
+                return false;
+        }
+    }
+    return true;
 }
 
 class CMerkleTx : public CTransaction
