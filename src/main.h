@@ -760,8 +760,9 @@ inline int64_t GetTxTypeFeeFloor(const CTransaction& tx, int nHeight)
         return 0;
     if (tx.IsCoinBase() || tx.IsCoinStake())
         return 0;
+
     if (HasBridgeMarker(tx))
-        return MARYJ_BRIDGE_FEE;
+        return MARYJ_STANDARD_FEE;
     bool fPegIn = false;
 #ifdef ENABLE_MWEB
     fPegIn = (tx.HasMWEB() && tx.mwTx.body.GetTotalPegIn() > 0);
