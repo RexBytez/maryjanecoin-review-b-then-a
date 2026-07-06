@@ -115,6 +115,28 @@ Commitment PedersenContext::Commit(int64_t nValue, const BlindingFactor& blind)
     return result;
 }
 
+static bool IsCanonicalCommitment(secp256k1_context* ctx, const unsigned char* p33)
+{
+    bool fAllZero = true;
+    for (size_t i = 0; i < COMMITMENT_SIZE; i++)
+        if (p33[i] != 0) { fAllZero = false; break; }
+    if (fAllZero)
+        return false;
+
+    secp256k1_pubkey pt;
+    if (!secp256k1_ec_pubkey_parse(ctx, &pt, p33, COMMITMENT_SIZE))
+        return false;
+
+    unsigned char round[COMMITMENT_SIZE];
+    size_t len = sizeof(round);
+    if (!secp256k1_ec_pubkey_serialize(ctx, round, &len, &pt, SECP256K1_EC_COMPRESSED))
+        return false;
+    if (len != COMMITMENT_SIZE || memcmp(round, p33, COMMITMENT_SIZE) != 0)
+        return false;
+
+    return true;
+}
+
 bool PedersenContext::VerifyCommitmentSum(
     const std::vector<Commitment>& vPositive,
     const std::vector<Commitment>& vNegative)
@@ -126,6 +148,9 @@ bool PedersenContext::VerifyCommitmentSum(
     std::vector<const secp256k1_pubkey*> posPtrs(vPositive.size());
     for (size_t i = 0; i < vPositive.size(); i++)
     {
+
+        if (!IsCanonicalCommitment(pCtx, vPositive[i].data))
+            return false;
         if (!secp256k1_ec_pubkey_parse(pCtx, &posKeys[i], vPositive[i].data, COMMITMENT_SIZE))
             return false;
         posPtrs[i] = &posKeys[i];
@@ -135,6 +160,8 @@ bool PedersenContext::VerifyCommitmentSum(
     std::vector<const secp256k1_pubkey*> negPtrs(vNegative.size());
     for (size_t i = 0; i < vNegative.size(); i++)
     {
+        if (!IsCanonicalCommitment(pCtx, vNegative[i].data))
+            return false;
         if (!secp256k1_ec_pubkey_parse(pCtx, &negKeys[i], vNegative[i].data, COMMITMENT_SIZE))
             return false;
         negPtrs[i] = &negKeys[i];

@@ -52,6 +52,12 @@ bool VerifyKernelSignatures(const CMWTransactionBody& body)
     {
         const CMWKernel& kernel = body.vKernels[i];
 
+        if (kernel.excess.IsNull())
+        {
+            printf("VerifyKernelSignatures() : kernel %zu has null/identity excess\n", i);
+            return false;
+        }
+
         uint256 msg = kernel.GetSignatureMessage();
 
         if (!crypto::SchnorrVerifier::VerifyExcess(kernel.excess, msg, kernel.signature))

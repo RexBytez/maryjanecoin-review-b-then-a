@@ -18,6 +18,30 @@
 namespace mw {
 namespace crypto {
 
+static bool IsCanonicalCompressedPoint(secp256k1_context* ctx,
+                                       const unsigned char* p33)
+{
+
+    bool fAllZero = true;
+    for (size_t i = 0; i < 33; i++)
+        if (p33[i] != 0) { fAllZero = false; break; }
+    if (fAllZero)
+        return false;
+
+    secp256k1_pubkey pt;
+    if (!secp256k1_ec_pubkey_parse(ctx, &pt, p33, 33))
+        return false;
+
+    unsigned char round[33];
+    size_t len = sizeof(round);
+    if (!secp256k1_ec_pubkey_serialize(ctx, round, &len, &pt, SECP256K1_EC_COMPRESSED))
+        return false;
+    if (len != 33 || memcmp(round, p33, 33) != 0)
+        return false;
+
+    return true;
+}
+
 Signature SchnorrSigner::Sign(const SecretKey& secretKey, const uint256& message)
 {
     Signature result;
@@ -109,6 +133,9 @@ bool SchnorrVerifier::Verify(const unsigned char* pPubKey33,
 {
     PedersenContext& pedersen = PedersenContext::Get();
     secp256k1_context* ctx = pedersen.GetContext();
+
+    if (!IsCanonicalCompressedPoint(ctx, pPubKey33))
+        return false;
 
     secp256k1_pubkey pubkey;
     if (!secp256k1_ec_pubkey_parse(ctx, &pubkey, pPubKey33, 33))

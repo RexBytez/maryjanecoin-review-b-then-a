@@ -658,6 +658,92 @@ BOOST_AUTO_TEST_CASE(test_mw_block_serialization)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(mweb_canon_tests)
+
+BOOST_AUTO_TEST_CASE(test_canon_honest_excess_still_verifies)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::BlindingFactor excess = ped.GenerateBlindingFactor();
+    uint256 msg = MakeRandomHash();
+    mw::Signature sig = mw::crypto::SchnorrSigner::SignExcess(excess, msg);
+    mw::Commitment excessCommit = mw::crypto::SchnorrSigner::GetExcessCommitment(excess);
+    BOOST_REQUIRE(!excessCommit.IsNull());
+    BOOST_CHECK(mw::crypto::SchnorrVerifier::VerifyExcess(excessCommit, msg, sig));
+}
+
+BOOST_AUTO_TEST_CASE(test_canon_allzero_excess_rejected)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::BlindingFactor excess = ped.GenerateBlindingFactor();
+    uint256 msg = MakeRandomHash();
+    mw::Signature sig = mw::crypto::SchnorrSigner::SignExcess(excess, msg);
+
+    mw::Commitment zero;
+    BOOST_REQUIRE(zero.IsNull());
+    BOOST_CHECK(!mw::crypto::SchnorrVerifier::VerifyExcess(zero, msg, sig));
+}
+
+BOOST_AUTO_TEST_CASE(test_canon_bad_prefix_excess_rejected)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::BlindingFactor excess = ped.GenerateBlindingFactor();
+    uint256 msg = MakeRandomHash();
+    mw::Signature sig = mw::crypto::SchnorrSigner::SignExcess(excess, msg);
+    mw::Commitment excessCommit = mw::crypto::SchnorrSigner::GetExcessCommitment(excess);
+    BOOST_REQUIRE(mw::crypto::SchnorrVerifier::VerifyExcess(excessCommit, msg, sig));
+
+    mw::Commitment bad = excessCommit;
+    bad.data[0] = 0x04;
+    BOOST_CHECK(!mw::crypto::SchnorrVerifier::VerifyExcess(bad, msg, sig));
+
+    bad.data[0] = 0x01;
+    BOOST_CHECK(!mw::crypto::SchnorrVerifier::VerifyExcess(bad, msg, sig));
+}
+
+BOOST_AUTO_TEST_CASE(test_canon_tampered_signature_rejected)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::BlindingFactor excess = ped.GenerateBlindingFactor();
+    uint256 msg = MakeRandomHash();
+    mw::Signature sig = mw::crypto::SchnorrSigner::SignExcess(excess, msg);
+    mw::Commitment excessCommit = mw::crypto::SchnorrSigner::GetExcessCommitment(excess);
+    BOOST_REQUIRE(mw::crypto::SchnorrVerifier::VerifyExcess(excessCommit, msg, sig));
+
+    mw::Signature tampered = sig;
+    tampered.data[40] ^= 0x01;
+    BOOST_CHECK(!mw::crypto::SchnorrVerifier::VerifyExcess(excessCommit, msg, tampered));
+}
+
+BOOST_AUTO_TEST_CASE(test_canon_commitment_sum_rejects_noncanonical)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::BlindingFactor blindIn  = ped.GenerateBlindingFactor();
+    mw::BlindingFactor blindOut = ped.GenerateBlindingFactor();
+    int64_t amount = 5000;
+    mw::Commitment cIn  = ped.Commit(amount, blindIn);
+    mw::Commitment cOut = ped.Commit(amount, blindOut);
+    mw::BlindingFactor excess = ped.BlindSum(
+        std::vector<mw::BlindingFactor>(1, blindOut),
+        std::vector<mw::BlindingFactor>(1, blindIn));
+    mw::Commitment cExcess = ped.CommitBlind(excess);
+
+    std::vector<mw::Commitment> positive(1, cOut);
+    std::vector<mw::Commitment> negative;
+    negative.push_back(cIn);
+    negative.push_back(cExcess);
+
+    BOOST_REQUIRE(ped.VerifyCommitmentSum(positive, negative));
+
+    std::vector<mw::Commitment> badPos(1, cOut);
+    badPos[0].data[0] = 0x04;
+    BOOST_CHECK(!ped.VerifyCommitmentSum(badPos, negative));
+
+    std::vector<mw::Commitment> zeroPos(1, mw::Commitment());
+    BOOST_CHECK(!ped.VerifyCommitmentSum(zeroPos, negative));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE(mweb_reorg_tests)
 
 BOOST_AUTO_TEST_CASE(test_mmr_node_count_formula)
