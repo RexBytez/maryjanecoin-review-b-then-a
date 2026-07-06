@@ -546,3 +546,25 @@ Value reorganizetoheight(const Array& params, bool fHelp)
 
     return result;
 }
+
+Value getsolcontractaddy(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getsolcontractaddy\n"
+            "Returns the Solana SPL MARYJ token mint address (contract).\n"
+            "Result:\n"
+            "{\n"
+            "  \"mint\"       : \"<base58 pubkey>\",\n"
+            "  \"symbol\"     : \"MARYJ\",\n"
+            "  \"decimals\"   : 6,\n"
+            "  \"network\"    : \"solana-mainnet\"\n"
+            "}\n");
+
+    Object obj;
+    obj.push_back(Pair("mint",     string("MARYJkS2kHxmVkQp8baNUL7d3R1pddLr65GgsArJAYY")));
+    obj.push_back(Pair("symbol",   string("MARYJ")));
+    obj.push_back(Pair("decimals", 6));
+    obj.push_back(Pair("network",  string("solana-mainnet")));
+    return obj;
+}

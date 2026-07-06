@@ -163,6 +163,7 @@ extern json_spirit::Value walletlock(const json_spirit::Array& params, bool fHel
 extern json_spirit::Value encryptwallet(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value validateaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getinfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getsolcontractaddy(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value reservebalance(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value checkwallet(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value repairwallet(const json_spirit::Array& params, bool fHelp);
@@ -185,14 +186,6 @@ extern json_spirit::Value getweight(const json_spirit::Array& params, bool fHelp
 extern json_spirit::Value getconfs(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value multisend(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value hashsettings(const json_spirit::Array& params, bool fHelp);
-
-extern json_spirit::Value bridgetosol(const json_spirit::Array& params, bool fHelp);
-
-extern json_spirit::Value getpaymentcode(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value sendtonotify(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listpaymentcodes(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value deriveaddress(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value scannotifications(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);

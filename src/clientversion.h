@@ -1,11 +1,22 @@
 #ifndef BITCOIN_CLIENTVERSION_H
 #define BITCOIN_CLIENTVERSION_H
 
-#define CLIENT_VERSION_MAJOR       1
-#define CLIENT_VERSION_MINOR       0
+#include <util/macros.h>
+
+#if defined(HAVE_CONFIG_H)
+#include <config/bitcoin-config.h>
+#endif
+
+#if !defined(CLIENT_VERSION_MAJOR)
+#define CLIENT_VERSION_MAJOR       4
+#define CLIENT_VERSION_MINOR       2
 #define CLIENT_VERSION_BUILD       0
 #define CLIENT_VERSION_IS_RELEASE  true
 #define COPYRIGHT_YEAR             2026
+#endif
+
+#define STRINGIZE(X) DO_STRINGIZE(X)
+#define DO_STRINGIZE(X) #X
 
 #if !defined(WINDRES_PREPROC)
 

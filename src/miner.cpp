@@ -580,7 +580,7 @@ void PowMinerThread(CWallet *pwallet, int threadId, int totalThreads)
 
         fBlockFound = false;
 
-        auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false));
+        unique_ptr<CBlock> pblock(CreateNewBlock(pwallet, false));
         if (!pblock.get())
         {
             MilliSleep(1000);

@@ -174,7 +174,7 @@ bool ComputeStealthSharedSecret(const CKey& privkey,
     BIGNUM* pX = BN_new();
     BIGNUM* pY = BN_new();
     if (!pX || !pY ||
-        !EC_POINT_get_affine_coordinates(pGroup, pSharedPoint, pX, pY, pCtx))
+        !EC_POINT_get_affine_coordinates_GFp(pGroup, pSharedPoint, pX, pY, pCtx))
     {
         if (pX) BN_free(pX);
         if (pY) BN_free(pY);

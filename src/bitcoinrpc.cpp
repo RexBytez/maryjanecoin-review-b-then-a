@@ -227,6 +227,7 @@ static const CRPCCommand vRPCCommands[] =
     { "getpeerinfo",            &getpeerinfo,            true,   false },
     { "getdifficulty",          &getdifficulty,          true,   false },
     { "getinfo",                &getinfo,                true,   false },
+    { "getsolcontractaddy",     &getsolcontractaddy,     true,   false },
 	{ "addnode",                &addnode,                true,   true  },
 	{ "getaddednodeinfo",       &getaddednodeinfo,       true,   true  },
     { "getsubsidy",             &getsubsidy,             true,   false },
@@ -239,7 +240,6 @@ static const CRPCCommand vRPCCommands[] =
     { "getaccount",             &getaccount,             false,  false },
     { "getaddressesbyaccount",  &getaddressesbyaccount,  true,   false },
     { "sendtoaddress",          &sendtoaddress,          false,  false },
-    { "bridgetosol",            &bridgetosol,            false,  false },
 	{ "setstakesplitthreshold", &setstakesplitthreshold, false,  false },
 	{ "getstakesplitthreshold", &getstakesplitthreshold, false,  false },
 	{ "rescanfromblock", 		&rescanfromblock, 		 false,  false },
@@ -325,12 +325,6 @@ static const CRPCCommand vRPCCommands[] =
     { "pegin",                  &pegin,                  false, false },
     { "pegout",                 &pegout,                 false, false },
     { "getpoolbalances",        &getpoolbalances,        true,  false },
-
-    { "getpaymentcode",         &getpaymentcode,         false, false },
-    { "sendtonotify",           &sendtonotify,           false, false },
-    { "listpaymentcodes",       &listpaymentcodes,       true,  false },
-    { "deriveaddress",          &deriveaddress,           false, false },
-    { "scannotifications",      &scannotifications,      false, false },
 };
 
 CRPCTable::CRPCTable()
@@ -1200,7 +1194,6 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
 
     if (strMethod == "stop"                   && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
-    if (strMethod == "bridgetosol"           && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "settxfee"               && n > 0) ConvertTo<double>(params[0]);
 	if (strMethod == "getaddednodeinfo"       && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>(params[1]);
