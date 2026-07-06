@@ -459,6 +459,9 @@ bool CTransaction::CheckTransaction() const
 
 #ifdef ENABLE_MWEB
 
+    if (nVersion >= CT_TX_VERSION && mwTx.IsNull())
+        return DoS(100, error("CTransaction::CheckTransaction() : MWEB-versioned tx carries no MWEB component (non-canonical framing)"));
+
     if (HasMWEB())
     {
 

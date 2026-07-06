@@ -446,6 +446,9 @@ public:
     (
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
+
+        if (fRead && this->nVersion < 1)
+            THROW_WITH_STACKTRACE(std::ios_base::failure("CTransaction::Unserialize() : non-canonical tx version"));
         READWRITE(nTime);
         READWRITE(vin);
         READWRITE(vout);

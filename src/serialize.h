@@ -182,7 +182,7 @@ void WriteCompactSize(Stream& os, uint64_t nSize)
 }
 
 template<typename Stream>
-uint64_t ReadCompactSize(Stream& is)
+uint64_t ReadCompactSize(Stream& is, bool fCanonicalCheck = true)
 {
     unsigned char chSize;
     READDATA(is, chSize);
@@ -196,18 +196,24 @@ uint64_t ReadCompactSize(Stream& is)
         unsigned short xSize;
         READDATA(is, xSize);
         nSizeRet = xSize;
+        if (fCanonicalCheck && nSizeRet < 253)
+            THROW_WITH_STACKTRACE(std::ios_base::failure("ReadCompactSize() : non-canonical ReadCompactSize()"));
     }
     else if (chSize == 254)
     {
         unsigned int xSize;
         READDATA(is, xSize);
         nSizeRet = xSize;
+        if (fCanonicalCheck && nSizeRet < 0x10000u)
+            THROW_WITH_STACKTRACE(std::ios_base::failure("ReadCompactSize() : non-canonical ReadCompactSize()"));
     }
     else
     {
         uint64_t xSize;
         READDATA(is, xSize);
         nSizeRet = xSize;
+        if (fCanonicalCheck && nSizeRet <= 0xFFFFFFFFull)
+            THROW_WITH_STACKTRACE(std::ios_base::failure("ReadCompactSize() : non-canonical ReadCompactSize()"));
     }
     if (nSizeRet > (uint64_t)MAX_SIZE)
         THROW_WITH_STACKTRACE(std::ios_base::failure("ReadCompactSize() : size too large"));
@@ -363,15 +369,15 @@ inline unsigned int GetSerializeSize(const T& a, long nType, int nVersion)
 }
 
 template<typename Stream, typename T>
-inline void Serialize(Stream& os, const T& a, long nType, int nVersion)
+inline void Serialize(Stream& os, const T& a, int nType, int nVersion)
 {
-    a.Serialize(os, (int)nType, nVersion);
+    a.Serialize(os, nType, nVersion);
 }
 
 template<typename Stream, typename T>
-inline void Unserialize(Stream& is, T& a, long nType, int nVersion)
+inline void Unserialize(Stream& is, T& a, int nType, int nVersion)
 {
-    a.Unserialize(is, (int)nType, nVersion);
+    a.Unserialize(is, nType, nVersion);
 }
 
 template<typename C>

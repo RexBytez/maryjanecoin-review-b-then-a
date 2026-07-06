@@ -5,9 +5,11 @@ test_maryjanecoin_SOURCES = \
   test/test_bitcoin.cpp \
   test/block_signature_tests.cpp \
   test/transaction_record_tests.cpp \
-  test/test_privacy.cpp
+  test/test_privacy.cpp \
+  test/serialize_canonical_tests.cpp \
+  test/test_mweb.cpp
 
-test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test
+test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test -DENABLE_MWEB
 test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 test_maryjanecoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(PTHREAD_FLAGS)
 
