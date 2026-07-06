@@ -5,6 +5,8 @@
 #include "init.h"
 #include "base58.h"
 #include "coincontrol.h"
+#include "stealth.h"
+#include "script.h"
 
 #include <sstream>
 #include <boost/lexical_cast.hpp>
@@ -104,6 +106,8 @@ Value getinfo(const Array& params, bool fHelp)
 	else if(mapHashedBlocks.count(nBestHeight - 1) && nLastCoinStakeSearchInterval)
 		nStaking = true;
 	obj.push_back(Pair("staking status", (nStaking ? "Staking Active" : "Staking Not Active")));
+    obj.push_back(Pair("stealth_mandatory", nBestHeight >= STEALTH_MANDATORY_HEIGHT));
+    obj.push_back(Pair("stealth_activation_height", STEALTH_MANDATORY_HEIGHT));
 
     if (pwalletMain->IsCrypted())
         obj.push_back(Pair("unlocked_until", (boost::int64_t)nWalletUnlockTime / 1000));
@@ -674,14 +678,13 @@ Value sendtoaddress(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 4)
         throw runtime_error(
-            "sendtoaddress <MaryJaneCoinaddress> <amount> [comment] [comment-to]\n"
+            "sendtoaddress <address> <amount> [comment] [comment-to]\n"
+            "Accepts both stealth addresses and regular MaryJaneCoin addresses.\n"
+            "When -stealthmandatory=1 (default), only stealth addresses are accepted.\n"
             "<amount> is a real and is rounded to the nearest 0.000001"
             + HelpRequiringPassphrase());
 
-    CBitcoinAddress address(params[0].get_str());
-    if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MaryJaneCoin address");
-
+    string strAddr = params[0].get_str();
     int64_t nAmount = AmountFromValue(params[1]);
 
     CWalletTx wtx;
@@ -692,6 +695,58 @@ Value sendtoaddress(const Array& params, bool fHelp)
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    CStealthAddress sxAddr;
+    if (sxAddr.SetEncoded(strAddr))
+    {
+
+        EnsureWalletIsUnlocked();
+
+        CStealthPayment payment;
+        if (!PrepareStealthPayment(sxAddr, payment))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to prepare stealth payment");
+
+        CScript scriptDest;
+        scriptDest.SetDestination(payment.destKeyID);
+
+        const vector<unsigned char>& vchEphemeral = payment.ephemeralPubKey.Raw();
+        if (vchEphemeral.size() != 33)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Ephemeral pubkey is not 33 bytes");
+
+        CScript scriptOpReturn;
+        scriptOpReturn << OP_RETURN << vchEphemeral;
+
+        vector<pair<CScript, int64_t> > vecSend;
+        vecSend.push_back(make_pair(scriptDest,     nAmount));
+        vecSend.push_back(make_pair(scriptOpReturn, (int64_t)0));
+
+        CReserveKey keyChange(pwalletMain);
+        int64_t nFeeRequired = 0;
+
+        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+        if (!fCreated)
+        {
+            if (nAmount + nFeeRequired > pwalletMain->GetBalance())
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
+        }
+
+        if (!pwalletMain->CommitTransaction(wtx, keyChange))
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
+
+        return wtx.GetHash().GetHex();
+    }
+
+    CBitcoinAddress address(strAddr);
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MaryJaneCoin address or stealth address");
+
+    if (CWallet::IsStealthMandatory())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+            "Stealth mandatory mode is active (-stealthmandatory=1). "
+            "You must send to a stealth address, not a regular address. "
+            "Use getnewstealthaddress on the recipient wallet to get one, "
+            "or set -stealthmandatory=0 to allow legacy sends.");
 
     string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, false);
     if (strError != "")
@@ -1013,14 +1068,14 @@ Value sendfrom(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3 || params.size() > 6)
         throw runtime_error(
-            "sendfrom <fromaccount> <toMaryJaneCoinaddress> <amount> [minconf=1] [comment] [comment-to]\n"
+            "sendfrom <fromaccount> <address> <amount> [minconf=1] [comment] [comment-to]\n"
+            "Accepts both stealth addresses and regular MaryJaneCoin addresses.\n"
+            "When -stealthmandatory=1 (default), only stealth addresses are accepted.\n"
             "<amount> is a real and is rounded to the nearest 0.000001"
             + HelpRequiringPassphrase());
 
     string strAccount = AccountFromValue(params[0]);
-    CBitcoinAddress address(params[1].get_str());
-    if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MaryJaneCoin address");
+    string strAddr = params[1].get_str();
     int64_t nAmount = AmountFromValue(params[2]);
 
     int nMinDepth = 1;
@@ -1040,6 +1095,56 @@ Value sendfrom(const Array& params, bool fHelp)
     if (nAmount > nBalance)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
+    CStealthAddress sxAddr;
+    if (sxAddr.SetEncoded(strAddr))
+    {
+
+        CStealthPayment payment;
+        if (!PrepareStealthPayment(sxAddr, payment))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to prepare stealth payment");
+
+        CScript scriptDest;
+        scriptDest.SetDestination(payment.destKeyID);
+
+        const vector<unsigned char>& vchEphemeral = payment.ephemeralPubKey.Raw();
+        if (vchEphemeral.size() != 33)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Ephemeral pubkey is not 33 bytes");
+
+        CScript scriptOpReturn;
+        scriptOpReturn << OP_RETURN << vchEphemeral;
+
+        vector<pair<CScript, int64_t> > vecSend;
+        vecSend.push_back(make_pair(scriptDest,     nAmount));
+        vecSend.push_back(make_pair(scriptOpReturn, (int64_t)0));
+
+        CReserveKey keyChange(pwalletMain);
+        int64_t nFeeRequired = 0;
+
+        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+        if (!fCreated)
+        {
+            if (nAmount + nFeeRequired > pwalletMain->GetBalance())
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
+        }
+
+        if (!pwalletMain->CommitTransaction(wtx, keyChange))
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
+
+        return wtx.GetHash().GetHex();
+    }
+
+    CBitcoinAddress address(strAddr);
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MaryJaneCoin address or stealth address");
+
+    if (CWallet::IsStealthMandatory())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+            "Stealth mandatory mode is active (-stealthmandatory=1). "
+            "You must send to a stealth address, not a regular address. "
+            "Use getnewstealthaddress on the recipient wallet to get one, "
+            "or set -stealthmandatory=0 to allow legacy sends.");
+
     string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, false);
     if (strError != "")
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
@@ -1052,6 +1157,8 @@ Value sendmany(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 4)
         throw runtime_error(
             "sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
+            "Accepts both stealth addresses and regular MaryJaneCoin addresses.\n"
+            "When -stealthmandatory=1 (default), only stealth addresses are accepted.\n"
             "amounts are double-precision floating point numbers"
             + HelpRequiringPassphrase());
 
@@ -1066,23 +1173,57 @@ Value sendmany(const Array& params, bool fHelp)
     if (params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
         wtx.mapValue["comment"] = params[3].get_str();
 
-    set<CBitcoinAddress> setAddress;
+    set<string> setAddrSeen;
     vector<pair<CScript, int64_t> > vecSend;
 
     int64_t totalAmount = 0;
     BOOST_FOREACH(const Pair& s, sendTo)
     {
-        CBitcoinAddress address(s.name_);
-        if (!address.IsValid())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid MaryJaneCoin address: ")+s.name_);
+        string strAddr = s.name_;
+        int64_t nAmount = AmountFromValue(s.value_);
 
-        if (setAddress.count(address))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
-        setAddress.insert(address);
+        if (setAddrSeen.count(strAddr))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + strAddr);
+        setAddrSeen.insert(strAddr);
+
+        CStealthAddress sxAddr;
+        if (sxAddr.SetEncoded(strAddr))
+        {
+            CStealthPayment payment;
+            if (!PrepareStealthPayment(sxAddr, payment))
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                    string("Failed to prepare stealth payment for: ") + strAddr);
+
+            CScript scriptDest;
+            scriptDest.SetDestination(payment.destKeyID);
+
+            const vector<unsigned char>& vchEphemeral = payment.ephemeralPubKey.Raw();
+            if (vchEphemeral.size() != 33)
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Ephemeral pubkey is not 33 bytes");
+
+            CScript scriptOpReturn;
+            scriptOpReturn << OP_RETURN << vchEphemeral;
+
+            vecSend.push_back(make_pair(scriptDest,     nAmount));
+            vecSend.push_back(make_pair(scriptOpReturn, (int64_t)0));
+
+            totalAmount += nAmount;
+            continue;
+        }
+
+        CBitcoinAddress address(strAddr);
+        if (!address.IsValid())
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+                string("Invalid MaryJaneCoin address or stealth address: ") + strAddr);
+
+        if (CWallet::IsStealthMandatory())
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+                "Stealth mandatory mode is active (-stealthmandatory=1). "
+                "All destinations must be stealth addresses. "
+                "Non-stealth address rejected: " + strAddr);
 
         CScript scriptPubKey;
         scriptPubKey.SetDestination(address.Get());
-        int64_t nAmount = AmountFromValue(s.value_);
 
         totalAmount += nAmount;
 

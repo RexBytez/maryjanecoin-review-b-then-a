@@ -45,6 +45,7 @@ static const int64_t MAX_MONEY = 1000 * 1000000 * COIN;
 static const int64_t MAX_MINT_PROOF_OF_STAKE = 1 * CENT;
 static const int MAX_TIME_SINCE_BEST_BLOCK = 10;
 static const int MODIFIER_INTERVAL_SWITCH = 20;
+static const int STEALTH_MANDATORY_HEIGHT = 1000;
 
 inline bool MoneyRange(int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
@@ -624,6 +625,22 @@ public:
 protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
 };
+
+inline bool HasStealthMarker(const CTransaction& tx)
+{
+    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    {
+        const CTxOut& txout = tx.vout[i];
+        if (txout.nValue == 0 &&
+            txout.scriptPubKey.size() == 35 &&
+            txout.scriptPubKey[0] == 0x6a &&
+            txout.scriptPubKey[1] == 0x21)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 class CMerkleTx : public CTransaction
 {

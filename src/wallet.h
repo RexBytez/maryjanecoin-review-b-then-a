@@ -18,6 +18,7 @@
 #include "util.h"
 #include "walletdb.h"
 #include "stealth.h"
+#include "bip47.h"
 
 extern bool fConfChange;
 class CAccountingEntry;
@@ -174,6 +175,17 @@ public:
 
     void GetStealthAddresses(std::vector<CStealthAddress>& vStealthOut) const;
 
+    int ScanBlockForStealthPayments(const CBlock& block);
+
+    static bool IsStealthMandatory();
+
+    std::map<std::string, CPaymentChannel> mapPaymentChannels;
+
+    bool AddPaymentChannel(const CPaymentChannel& channel);
+    bool AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel);
+
+    void GetPaymentChannels(std::vector<CPaymentChannel>& vChannelsOut) const;
+
     CPubKey vchDefaultKey;
     int64_t nTimeFirstKey;
 
@@ -183,6 +195,13 @@ public:
     void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, const CCoinControl *coinControl=NULL) const;
     bool SelectCoinsMinConf(int64_t nTargetValue, unsigned int nSpendTime, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const;
     bool SelectCoinsMinConfByCoinAge(int64_t nTargetValue, unsigned int nSpendTime, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const;
+
+    bool SelectCoinsPrivacy(int64_t nTargetValue, unsigned int nSpendTime, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet, const CCoinControl* coinControl = NULL) const;
+
+    bool SelectCoinsForPayJoin(const std::vector<int64_t>& vTargetDenominations,
+                               int nMaxInputs,
+                               std::set<std::pair<const CWalletTx*, unsigned int> >& setCoinsRet,
+                               int64_t& nValueRet) const;
 
     CPubKey GenerateNewKey();
 

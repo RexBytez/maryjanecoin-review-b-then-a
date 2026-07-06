@@ -499,6 +499,15 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     if (tx.IsCoinStake())
         return tx.DoS(100, error("CTxMemPool::accept() : coinstake as individual tx"));
 
+    if (nBestHeight >= STEALTH_MANDATORY_HEIGHT)
+    {
+        if (!tx.IsCoinBase() && !tx.IsCoinStake() && !HasStealthMarker(tx))
+        {
+            return error("CTxMemPool::accept() : transaction %s rejected: "
+                "missing mandatory stealth marker", tx.GetHash().ToString().c_str());
+        }
+    }
+
     if ((int64_t)tx.nLockTime > std::numeric_limits<int>::max())
         return error("CTxMemPool::accept() : not accepting nLockTime beyond 2038 yet");
 
@@ -1429,6 +1438,25 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         }
 
         mapQueuedChanges[hashTx] = CTxIndex(posThisTx, tx.vout.size());
+    }
+
+    if (pindex->nHeight >= STEALTH_MANDATORY_HEIGHT)
+    {
+        for (unsigned int i = 0; i < vtx.size(); i++)
+        {
+            const CTransaction& tx = vtx[i];
+
+            if (tx.IsCoinBase()) continue;
+
+            if (tx.IsCoinStake()) continue;
+
+            if (!HasStealthMarker(tx))
+            {
+                return DoS(100, error("ConnectBlock() : transaction %s at height %d "
+                    "missing mandatory stealth marker (OP_RETURN with ephemeral pubkey)",
+                    tx.GetHash().ToString().c_str(), pindex->nHeight));
+            }
+        }
     }
 
     if (IsProofOfWork())
