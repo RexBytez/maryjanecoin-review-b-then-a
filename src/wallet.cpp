@@ -3676,6 +3676,19 @@ int CWallet::ScanBlockForStealthPayments(const CBlock& block)
     return nFound;
 }
 
+bool CWallet::AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel)
+{
+    LOCK(cs_wallet);
+    mapPaymentChannels[strKey] = channel;
+    if (fFileBacked)
+    {
+        CWalletDB walletdb(strWalletFile);
+        if (!walletdb.WritePaymentChannel(strKey, channel))
+            return false;
+    }
+    return true;
+}
+
 static const int64_t AUTOMIX_MIN_VALUE = 200000000LL;
 
 static const int AUTOMIX_INTERVAL = 60;

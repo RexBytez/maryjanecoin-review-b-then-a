@@ -451,6 +451,15 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
 			if (sxAddr.IsValid())
 				pwallet->mapStealthAddresses[strEncoded] = sxAddr;
 		}
+		else if (strType == "bip47chan")
+		{
+			std::string strKey;
+			ssKey >> strKey;
+			CPaymentChannel channel;
+			ssValue >> channel;
+			if (channel.theirCode.IsValid() || strKey == "__self__")
+				pwallet->mapPaymentChannels[strKey] = channel;
+		}
     } catch (...)
     {
         return false;

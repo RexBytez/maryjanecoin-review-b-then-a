@@ -18,6 +18,7 @@
 #include "util.h"
 #include "walletdb.h"
 #include "stealth.h"
+#include "bip47.h"
 
 extern bool fConfChange;
 class CAccountingEntry;
@@ -191,6 +192,9 @@ public:
     int ScanBlockForStealthPayments(const CBlock& block);
 
     static bool IsStealthMandatory();
+
+    std::map<std::string, CPaymentChannel> mapPaymentChannels;
+    bool AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel);
 
     CPubKey vchDefaultKey;
     int64_t nTimeFirstKey;

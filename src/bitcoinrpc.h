@@ -188,6 +188,12 @@ extern json_spirit::Value hashsettings(const json_spirit::Array& params, bool fH
 
 extern json_spirit::Value bridgetosol(const json_spirit::Array& params, bool fHelp);
 
+extern json_spirit::Value getpaymentcode(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value sendtonotify(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listpaymentcodes(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value deriveaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value scannotifications(const json_spirit::Array& params, bool fHelp);
+
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawtransaction(const json_spirit::Array& params, bool fHelp);

@@ -325,6 +325,12 @@ static const CRPCCommand vRPCCommands[] =
     { "pegin",                  &pegin,                  false, false },
     { "pegout",                 &pegout,                 false, false },
     { "getpoolbalances",        &getpoolbalances,        true,  false },
+
+    { "getpaymentcode",         &getpaymentcode,         false, false },
+    { "sendtonotify",           &sendtonotify,           false, false },
+    { "listpaymentcodes",       &listpaymentcodes,       true,  false },
+    { "deriveaddress",          &deriveaddress,           false, false },
+    { "scannotifications",      &scannotifications,      false, false },
 };
 
 CRPCTable::CRPCTable()

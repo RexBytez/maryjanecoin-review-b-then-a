@@ -4,6 +4,7 @@
 #include "db.h"
 #include "base58.h"
 #include "stealth.h"
+#include "bip47.h"
 
 class CKeyPool;
 class CAccount;
@@ -319,6 +320,18 @@ public:
     {
         nWalletDBUpdated++;
         return Erase(std::make_pair(std::string("sxaddr"), sxAddr.Encoded()));
+    }
+
+    bool WritePaymentChannel(const std::string& strKey, const CPaymentChannel& channel)
+    {
+        nWalletDBUpdated++;
+        return Write(std::make_pair(std::string("bip47chan"), strKey), channel);
+    }
+
+    bool ErasePaymentChannel(const std::string& strKey)
+    {
+        nWalletDBUpdated++;
+        return Erase(std::make_pair(std::string("bip47chan"), strKey));
     }
 
     bool ReadAccount(const std::string& strAccount, CAccount& account);

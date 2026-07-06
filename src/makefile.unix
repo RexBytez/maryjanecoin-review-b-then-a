@@ -169,7 +169,9 @@ OBJS= \
     obj/rpcstealth.o \
     obj/coinjoin.o \
     obj/rpccoinjoin.o \
-    obj/rpcpools.o
+    obj/rpcpools.o \
+    obj/bip47.o \
+    obj/rpcbip47.o
 
 all: MaryJaneCoind
 
