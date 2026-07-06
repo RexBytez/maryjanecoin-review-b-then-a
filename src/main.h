@@ -12,6 +12,10 @@
 #include "scrypt.h"
 #include "hashblock.h"
 
+#ifdef ENABLE_MWEB
+#include "mw/models/block.h"
+#endif
+
 #include <list>
 
 class CWallet;
@@ -56,8 +60,8 @@ static const int fHaveUPnP = true;
 static const int fHaveUPnP = false;
 #endif
 
-static const uint256 hashGenesisBlock("00000d66a88d8c68f443662c450129012726295b73fabb071f7fb7a2a2f0d01d");
-static const uint256 hashGenesisBlockTestNet("00000d66a88d8c68f443662c450129012726295b73fabb071f7fb7a2a2f0d01d");
+static const uint256 hashGenesisBlock("000001b8e7e172fd4b860cd42ae50de44334d4969376871eab0d9e58e48525b2");
+static const uint256 hashGenesisBlockTestNet("000001b8e7e172fd4b860cd42ae50de44334d4969376871eab0d9e58e48525b2");
 
 inline int64_t GetClockDrift(int64_t nTime)
 {
@@ -832,6 +836,11 @@ public:
 
     std::vector<unsigned char> vchBlockSig;
 
+#ifdef ENABLE_MWEB
+
+    mw::CMWBlock mwExtBlock;
+#endif
+
     mutable std::vector<uint256> vMerkleTree;
 
     mutable int nDoS;
@@ -856,6 +865,13 @@ public:
         {
             READWRITE(vtx);
             READWRITE(vchBlockSig);
+#ifdef ENABLE_MWEB
+
+            if (this->nVersion & 0x20000000)
+            {
+                READWRITE(mwExtBlock);
+            }
+#endif
         }
         else if (fRead)
         {
@@ -869,6 +885,9 @@ public:
 		CBlockHeader::SetNull();
         vtx.clear();
         vchBlockSig.clear();
+#ifdef ENABLE_MWEB
+        mwExtBlock = mw::CMWBlock();
+#endif
         vMerkleTree.clear();
         nDoS = 0;
     }

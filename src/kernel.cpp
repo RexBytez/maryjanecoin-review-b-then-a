@@ -344,7 +344,8 @@ bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx)
 
 unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 {
-    assert (pindex->pprev || pindex->GetBlockHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
+
+    assert (pindex->pprev || pindex->nHeight == 0);
 
     CDataStream ss(SER_GETHASH, 0);
     if (pindex->pprev)
@@ -363,11 +364,8 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
     {
         if (nStakeModifierChecksum != checkpoints[nHeight])
         {
-
-            printf("MaryJaneCoin: StakeModifier checkpoint mismatch at height %d: got 0x%08xu, expected 0x%08xu\n",
+            printf("MaryJaneCoin: StakeModifier checkpoint mismatch at height %d: got 0x%08x, expected 0x%08x\n",
                    nHeight, nStakeModifierChecksum, checkpoints[nHeight]);
-
-            if (nHeight == 0) return true;
             return false;
         }
     }

@@ -356,7 +356,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
-        if (pindexGenesisBlock == NULL && blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
+        if (pindexGenesisBlock == NULL && pindexNew->nHeight == 0)
             pindexGenesisBlock = pindexNew;
 
         if (!pindexNew->CheckIndex()) {

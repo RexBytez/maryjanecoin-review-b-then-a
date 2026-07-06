@@ -8,6 +8,13 @@
 #include "kernel.h"
 #include "dandelion.h"
 #include "types/camount.h"
+
+#ifdef ENABLE_MWEB
+#include "mw/mw_wallet.h"
+#include "mw/validation.h"
+#include "mw/state/mw_state.h"
+#include "mw/peg.h"
+#endif
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -68,6 +75,17 @@ int64_t nMinimumInputValue = 0;
 int64_t nCombineThreshold = DEF_COMBINE_AMOUNT;
 
 extern enum Checkpoints::CPMode CheckpointsMode;
+
+#ifdef ENABLE_MWEB
+
+mw::CMWState g_mwState;
+
+mw::CMWWallet g_mwWallet;
+
+extern const int MWEB_ACTIVATION_HEIGHT = 0;
+
+const int MWEB_VERSION_BIT = 0x20000000;
+#endif
 
 void RegisterWallet(CWallet* pwalletIn)
 {
@@ -1326,6 +1344,23 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
     BOOST_FOREACH(CTransaction& tx, vtx)
         SyncWithWallets(tx, this, false, false);
 
+#ifdef ENABLE_MWEB
+
+    if (MWEB_ACTIVATION_HEIGHT > 0 && pindex->nHeight >= MWEB_ACTIVATION_HEIGHT)
+    {
+
+        printf("DisconnectBlock() : rolling back MWEB state at height %d\n", pindex->nHeight);
+
+        if (g_mwState.GetHeight() == pindex->nHeight)
+        {
+
+            int32_t nPrevHeight = (pindex->pprev) ? pindex->pprev->nHeight : 0;
+            uint256 hashPrev = (pindex->pprev) ? pindex->pprev->GetBlockHash() : uint256(0);
+            g_mwState.SetLatestBlock(hashPrev, nPrevHeight);
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -1448,6 +1483,83 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     BOOST_FOREACH(CTransaction& tx, vtx)
         SyncWithWallets(tx, this, true);
 
+#ifdef ENABLE_MWEB
+
+    if (MWEB_ACTIVATION_HEIGHT > 0 && pindex->nHeight >= MWEB_ACTIVATION_HEIGHT)
+    {
+
+        if (nVersion & MWEB_VERSION_BIT)
+        {
+
+            mw::CMWBlock mwBlock;
+            if (mwExtBlock.IsNull())
+            {
+                printf("ConnectBlock() : MWEB version bit set but no extension block data at height %d\n",
+                       pindex->nHeight);
+            }
+            else
+            {
+                mwBlock = mwExtBlock;
+            }
+
+            if (!mwBlock.IsNull())
+            {
+
+                int64_t nTransparentPegIn = 0;
+                int64_t nTransparentPegOut = 0;
+
+                BOOST_FOREACH(const CTransaction& tx, vtx)
+                {
+                    mw::Commitment pegCommitment;
+                    int64_t nPegAmount = 0;
+                    if (mw::IsPegInTransaction(tx, pegCommitment, nPegAmount))
+                        nTransparentPegIn += nPegAmount;
+                }
+
+                mw::CMWValidationResult mwResult = mw::ValidateMWBlock(
+                    mwBlock, g_mwState, pindex->nHeight,
+                    nTransparentPegIn, nTransparentPegOut);
+
+                if (!mwResult.IsValid())
+                {
+                    return error("ConnectBlock() : MWEB validation failed: %s",
+                                 mwResult.strMessage.c_str());
+                }
+
+                for (size_t i = 0; i < mwBlock.body.vOutputs.size(); i++)
+                {
+                    g_mwState.AddOutput(mwBlock.body.vOutputs[i]);
+                }
+
+                for (size_t i = 0; i < mwBlock.body.vInputs.size(); i++)
+                {
+                    g_mwState.SpendOutput(mwBlock.body.vInputs[i].commitment);
+                }
+
+                for (size_t i = 0; i < mwBlock.body.vKernels.size(); i++)
+                {
+                    g_mwState.AddKernelExcess(mwBlock.body.vKernels[i].excess);
+                }
+
+                int64_t nSupplyDelta = mwBlock.GetTotalPegIn() - mwBlock.GetTotalPegOut();
+                g_mwState.AdjustSupply(nSupplyDelta);
+
+                g_mwState.SetLatestBlock(mwBlock.GetHash(), pindex->nHeight);
+
+                g_mwWallet.ScanForOutputs(mwBlock);
+
+                printf("ConnectBlock() : MWEB block processed at height %d "
+                       "(outputs=%u, inputs=%u, kernels=%u, supply_delta=%" PRId64 ")\n",
+                       pindex->nHeight,
+                       (unsigned int)mwBlock.body.vOutputs.size(),
+                       (unsigned int)mwBlock.body.vInputs.size(),
+                       (unsigned int)mwBlock.body.vKernels.size(),
+                       nSupplyDelta);
+            }
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -1568,7 +1680,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     if (!txdb.TxnBegin())
         return error("SetBestChain() : TxnBegin failed");
 
-    if (pindexGenesisBlock == NULL && hash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
+    if (pindexGenesisBlock == NULL && pindexNew->nHeight == 0)
     {
         txdb.WriteHashBestChain(hash);
         if (!txdb.TxnCommit())
@@ -2556,9 +2668,9 @@ bool LoadBlockIndex(bool fAllowNew)
     {
         if (!fAllowNew)
             return false;
-        const char* pszTimestamp = "MaryJaneCoin Breaks The Internet - A Privacy PotCoin";
+        const char* pszTimestamp = "MaryJaneCoin v2 - Fresh Start April 2026";
         CTransaction txNew;
-        txNew.nTime = 1775447000;
+        txNew.nTime = 1775670000;
         txNew.vin.resize(1);
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(42) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2568,11 +2680,11 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = 1775447000;
+        block.nTime    = 1775670000;
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 134276;
+        block.nNonce   = 2337183;
 
-        assert(block.hashMerkleRoot == uint256("4b0aae88f8f5a9769272bcd1a1e42ccf5cb7d60eb8e93e771913d53b7fc47075"));
+        assert(block.hashMerkleRoot == uint256("7e98ed2e0c51af2d9bc1e2bee6eb572217c18f555e4b130c125799481fcac479"));
         block.print();
         assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
 
@@ -2583,7 +2695,7 @@ bool LoadBlockIndex(bool fAllowNew)
         if (!block.AddToBlockIndex(nFile, nBlockPos, 0))
             return error("LoadBlockIndex() : genesis block not accepted");
 
-        if (!Checkpoints::WriteSyncCheckpoint((!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)))
+        if (!Checkpoints::WriteSyncCheckpoint(block.GetHash()))
             return error("LoadBlockIndex() : failed to init sync checkpoint");
     }
 
