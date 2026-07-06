@@ -17,7 +17,14 @@ if ENABLE_MWEB
 test_maryjanecoin_SOURCES += test/test_mweb.cpp
 endif
 
-test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test -DENABLE_MWEB
+test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test
+# CRITICAL: -DENABLE_MWEB must MATCH the library build. Hardcoding it here while the
+# library is built --enable-mweb=no gave CBlock/CTransaction two different sizes (the
+# #ifdef ENABLE_MWEB mwTx member), an ODR violation that corrupted the stack in
+# CDiskBlockIndex::GetBlockHash (stack-smash SIGABRT). Define it only when the lib does.
+if ENABLE_MWEB
+test_maryjanecoin_CPPFLAGS += -DENABLE_MWEB
+endif
 test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 test_maryjanecoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(PTHREAD_FLAGS)
 
