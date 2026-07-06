@@ -1,5 +1,6 @@
 #include "stealth.h"
 #include "util.h"
+#include "ephemeral-guard.h"
 #include "base58.h"
 
 #include <openssl/ec.h>
@@ -415,12 +416,33 @@ bool PrepareStealthPayment(const CStealthAddress& address,
     if (!address.IsValid())
         return false;
 
-    CKey ephemeralKey;
-    ephemeralKey.MakeNewKey(true );
-    if (!ephemeralKey.IsValid())
-        return false;
+    static EphemeralKeyGuard s_ephemeralGuard(1000000, 1e-9);
+    static const int MAX_EPHEMERAL_RETRIES = 8;
 
-    paymentOut.ephemeralPubKey = ephemeralKey.GetPubKey();
+    CKey ephemeralKey;
+    bool fGotUnique = false;
+    for (int attempt = 0; attempt < MAX_EPHEMERAL_RETRIES; attempt++)
+    {
+        ephemeralKey.MakeNewKey(true );
+        if (!ephemeralKey.IsValid())
+            return false;
+
+        paymentOut.ephemeralPubKey = ephemeralKey.GetPubKey();
+
+        const std::vector<unsigned char>& vchR = paymentOut.ephemeralPubKey.Raw();
+        if (!s_ephemeralGuard.WouldReuse(vchR))
+        {
+            s_ephemeralGuard.Record(vchR);
+            fGotUnique = true;
+            break;
+        }
+        printf("WARNING: PrepareStealthPayment ephemeral-key REUSE detected "
+               "(attempt %d/%d) — possible RNG failure; regenerating\n",
+               attempt + 1, MAX_EPHEMERAL_RETRIES);
+    }
+    if (!fGotUnique)
+        return error("PrepareStealthPayment : ephemeral-key reuse persisted after %d "
+                     "attempts — refusing to send (RNG failure?)", MAX_EPHEMERAL_RETRIES);
 
     uint256 sharedSecret;
     if (!ComputeStealthSharedSecret(ephemeralKey, address.scanPubKey, sharedSecret))
