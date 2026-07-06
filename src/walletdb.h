@@ -3,6 +3,7 @@
 
 #include "db.h"
 #include "base58.h"
+#include "stealth.h"
 
 class CKeyPool;
 class CAccount;
@@ -306,6 +307,18 @@ public:
     bool WriteMinVersion(int nVersion)
     {
         return Write(std::string("minversion"), nVersion);
+    }
+
+    bool WriteStealthAddress(const CStealthAddress& sxAddr)
+    {
+        nWalletDBUpdated++;
+        return Write(std::make_pair(std::string("sxaddr"), sxAddr.Encoded()), sxAddr);
+    }
+
+    bool EraseStealthAddress(const CStealthAddress& sxAddr)
+    {
+        nWalletDBUpdated++;
+        return Erase(std::make_pair(std::string("sxaddr"), sxAddr.Encoded()));
     }
 
     bool ReadAccount(const std::string& strAccount, CAccount& account);

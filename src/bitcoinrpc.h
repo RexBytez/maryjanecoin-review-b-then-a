@@ -208,4 +208,13 @@ extern json_spirit::Value reorganizetoheight(const json_spirit::Array& params, b
 extern json_spirit::Value moneysupply(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getmoneysupply(const json_spirit::Array& params, bool fHelp);
 
+extern json_spirit::Value coinjoin(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value coinjoinauto(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value coinjoininfo(const json_spirit::Array& params, bool fHelp);
+
+extern json_spirit::Value getnewstealthaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststealthaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value sendtostealthaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value scanstealthpayments(const json_spirit::Array& params, bool fHelp);
+
 #endif

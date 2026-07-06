@@ -6,6 +6,7 @@
 #include "strlcpy.h"
 #include "addrman.h"
 #include "ui_interface.h"
+#include "dandelion.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -1065,6 +1066,7 @@ void MapPort()
 
 static const char *strDNSSeed[][2] = {
   {"maryjanecoin", "seeds.maryjanecoin.net"},
+  {"maryjanecoin-seed", "35.155.206.7"},
 };
 
 void ThreadDNSAddressSeed(void* parg)
@@ -1536,6 +1538,25 @@ void ThreadMessageHandler2(void* parg)
                 pnode->Release();
         }
 
+        {
+            std::vector<uint256> vEmbargoed = g_dandelion.GetEmbargoedTxs();
+            BOOST_FOREACH(const uint256& embargoHash, vEmbargoed)
+            {
+                g_dandelion.MarkFluffed(embargoHash);
+
+                LOCK(mempool.cs);
+                if (mempool.exists(embargoHash))
+                {
+                    CTransaction& tx = mempool.lookup(embargoHash);
+                    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                    ss.reserve(10000);
+                    ss << tx;
+
+                    RelayTransaction(tx, embargoHash, ss);
+                }
+            }
+        }
+
         vnThreadsRunning[THREAD_MESSAGEHANDLER]--;
         MilliSleep(100);
         if (fRequestShutdown)
@@ -1860,6 +1881,35 @@ void RelayTransaction(const CTransaction& tx, const uint256& hash, const CDataSt
         mapRelay.insert(std::make_pair(inv, ss));
         vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
     }
+
+    if (g_dandelion.IsStemPhase(hash))
+    {
+        CNode* pStemPeer = g_dandelion.GetStemPeer(hash);
+        if (pStemPeer != NULL)
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                if (pnode != pStemPeer)
+                    continue;
+                if (!pnode->fRelayTxes)
+                    break;
+                LOCK(pnode->cs_filter);
+                if (pnode->pfilter)
+                {
+                    if (pnode->pfilter->IsRelevantAndUpdate(tx, hash))
+                        pnode->PushInventory(inv);
+                }
+                else
+                    pnode->PushInventory(inv);
+                break;
+            }
+            return;
+        }
+
+        g_dandelion.MarkFluffed(hash);
+    }
+
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
     {

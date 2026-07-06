@@ -4,7 +4,8 @@ if ENABLE_TESTS
 test_maryjanecoin_SOURCES = \
   test/test_bitcoin.cpp \
   test/block_signature_tests.cpp \
-  test/transaction_record_tests.cpp
+  test/transaction_record_tests.cpp \
+  test/test_privacy.cpp
 
 test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test
 test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)

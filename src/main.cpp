@@ -6,6 +6,7 @@
 #include "init.h"
 #include "ui_interface.h"
 #include "kernel.h"
+#include "dandelion.h"
 #include "types/camount.h"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
@@ -2557,7 +2558,7 @@ bool LoadBlockIndex(bool fAllowNew)
             return false;
         const char* pszTimestamp = "MaryJaneCoin Breaks The Internet - A Privacy PotCoin";
         CTransaction txNew;
-        txNew.nTime = 1774803100;
+        txNew.nTime = 1775620800;
         txNew.vin.resize(1);
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(42) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2567,11 +2568,11 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = 1774803100;
+        block.nTime    = 1775620800;
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 1054102;
+        block.nNonce   = 109264;
 
-        assert(block.hashMerkleRoot == uint256("51d897834ac4834bec5fa26ed648ccea33173f9f8c66911561554ee25441e0d0"));
+        assert(block.hashMerkleRoot == uint256("fbfd18f3c7efae5028ccc7af2ab23890303279659acf8c3dfec2b1a5daf188db"));
         block.print();
         assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
 
@@ -3459,6 +3460,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             if (fDebug) printf("ProcessMessage-tx: Accepted to memory pool\n");
             SyncWithWallets(tx, NULL, true);
             if (fDebug) printf("ProcessMessage-tx: Synced with wallet\n");
+
+            if (g_dandelion.ShouldFluff(inv.hash))
+            {
+
+                g_dandelion.MarkFluffed(inv.hash);
+            }
+            else
+            {
+
+                int nIncomingHops = 0;
+                {
+
+                    nIncomingHops = 1;
+                }
+                g_dandelion.AddStemTx(inv.hash, nIncomingHops);
+            }
+
             RelayTransaction(tx, inv.hash);
             if (fDebug) printf("ProcessMessage-tx: Relayed transaction\n");
             mapAlreadyAskedFor.erase(inv);
@@ -3482,6 +3500,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     {
                         printf("   accepted orphan tx %s\n", orphanTxHash.ToString().substr(0,10).c_str());
                         SyncWithWallets(tx, NULL, true);
+
+                        if (g_dandelion.ShouldFluff(orphanTxHash))
+                            g_dandelion.MarkFluffed(orphanTxHash);
+                        else
+                            g_dandelion.AddStemTx(orphanTxHash, 1);
                         RelayTransaction(orphanTx, orphanTxHash);
                         mapAlreadyAskedFor.erase(CInv(MSG_TX, orphanTxHash));
                         vWorkQueue.push_back(orphanTxHash);

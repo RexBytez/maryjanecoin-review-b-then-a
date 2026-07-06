@@ -163,7 +163,12 @@ OBJS= \
     obj/scrypt-x86.o \
     obj/scrypt-x86_64.o \
     obj/cleanse.o \
-    obj/lockedpool.o
+    obj/lockedpool.o \
+    obj/dandelion.o \
+    obj/stealth.o \
+    obj/rpcstealth.o \
+    obj/coinjoin.o \
+    obj/rpccoinjoin.o
 
 all: MaryJaneCoind
 
@@ -219,8 +224,28 @@ install: MaryJaneCoind
 	install -d $(DESTDIR)$(PREFIX)/bin/
 	install -m 775 MaryJaneCoind $(DESTDIR)$(PREFIX)/bin/
 
+# Privacy unit tests
+TEST_OBJS = obj-test/test_privacy.o
+
+# Test objects need the same flags plus boost_unit_test_framework
+# Reuse most daemon objects but replace bitcoind.o and noui.o with test main
+TESTLIBS = $(LIBS) -l boost_unit_test_framework
+
+TEST_DAEMON_OBJS = $(filter-out obj/bitcoind.o, $(OBJS))
+
+obj-test/%.o: test/%.cpp
+	@mkdir -p obj-test
+	$(CXX) -c $(xCXXFLAGS) -DBOOST_TEST_DYN_LINK -MMD -MF $(@:%.o=%.d) -o $@ $<
+
+test_privacy: $(TEST_DAEMON_OBJS) $(TEST_OBJS)
+	$(LINK) $(xCXXFLAGS) -o $@ $^ $(xLDFLAGS) $(TESTLIBS)
+
+test: test_privacy
+	./test_privacy --log_level=test_suite
+
 clean:
 	-rm -f MaryJaneCoind
+	-rm -f test_privacy
 	-rm -f obj/*.o
 	-rm -f obj/*.P
 	-rm -f obj-test/*.o

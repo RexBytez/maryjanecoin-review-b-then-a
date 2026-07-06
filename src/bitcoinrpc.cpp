@@ -312,6 +312,14 @@ static const CRPCCommand vRPCCommands[] =
 	{ "getweight",        		&getweight,              false,	false },
 	{ "getconfs",        		&getconfs,               false,	false },
 	{ "hashsettings",        	&hashsettings,           false, false },
+    { "coinjoin",               &coinjoin,               false, false },
+    { "coinjoinauto",           &coinjoinauto,           false, false },
+    { "coinjoininfo",           &coinjoininfo,           true,  false },
+
+    { "getnewstealthaddress",   &getnewstealthaddress,   false, false },
+    { "liststealthaddresses",   &liststealthaddresses,   true,  false },
+    { "sendtostealthaddress",   &sendtostealthaddress,   false, false },
+    { "scanstealthpayments",    &scanstealthpayments,    false, false },
 };
 
 CRPCTable::CRPCTable()

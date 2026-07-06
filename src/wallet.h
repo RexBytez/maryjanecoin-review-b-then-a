@@ -17,6 +17,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "walletdb.h"
+#include "stealth.h"
 
 extern bool fConfChange;
 class CAccountingEntry;
@@ -166,6 +167,12 @@ public:
     std::map<uint256, int> mapRequestCount;
 
     std::map<CTxDestination, std::string> mapAddressBook;
+
+    std::map<std::string, CStealthAddress> mapStealthAddresses;
+
+    bool AddStealthAddress(const CStealthAddress& sxAddr);
+
+    void GetStealthAddresses(std::vector<CStealthAddress>& vStealthOut) const;
 
     CPubKey vchDefaultKey;
     int64_t nTimeFirstKey;

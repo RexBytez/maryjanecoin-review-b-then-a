@@ -442,6 +442,15 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
 			ssValue >> fEnable;
 			pwallet->fStakeForCharity = fEnable;
 		}
+		else if (strType == "sxaddr")
+		{
+			std::string strEncoded;
+			ssKey >> strEncoded;
+			CStealthAddress sxAddr;
+			ssValue >> sxAddr;
+			if (sxAddr.IsValid())
+				pwallet->mapStealthAddresses[strEncoded] = sxAddr;
+		}
     } catch (...)
     {
         return false;

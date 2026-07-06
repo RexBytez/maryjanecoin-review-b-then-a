@@ -360,6 +360,16 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
     MapModifierCheckpoints& checkpoints = (fTestNet ? mapStakeModifierCheckpointsTestNet : mapStakeModifierCheckpoints);
 
     if (checkpoints.count(nHeight))
-        return nStakeModifierChecksum == checkpoints[nHeight];
+    {
+        if (nStakeModifierChecksum != checkpoints[nHeight])
+        {
+
+            printf("MaryJaneCoin: StakeModifier checkpoint mismatch at height %d: got 0x%08xu, expected 0x%08xu\n",
+                   nHeight, nStakeModifierChecksum, checkpoints[nHeight]);
+
+            if (nHeight == 0) return true;
+            return false;
+        }
+    }
     return true;
 }

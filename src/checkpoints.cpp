@@ -320,7 +320,7 @@ namespace Checkpoints
     }
 }
 
-const std::string CSyncCheckpoint::strMasterPubKey = "";
+const std::string CSyncCheckpoint::strMasterPubKey = "0451f094290d7186c8b2ec98b3db33c5d06628ec8b8895f9d631b9f2c6e3f3bab4521c6773a705b1ff3b34bb7f806b8aabde682fe9a01737b6e425864f5e0f58e9";
 
 std::string CSyncCheckpoint::strMasterPrivKey = "";
 

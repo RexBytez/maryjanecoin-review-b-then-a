@@ -6,6 +6,7 @@
 #include "base58.h"
 #include "kernel.h"
 #include "coincontrol.h"
+#include "dandelion.h"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
@@ -911,6 +912,8 @@ void CWalletTx::RelayWalletTransaction(CTxDB& txdb)
         if (!txdb.ContainsTx(hash))
         {
             printf("Relaying wtx %s\n", hash.ToString().substr(0,10).c_str());
+
+            g_dandelion.AddLocalTx(hash);
             RelayTransaction((CTransaction)*this, hash);
         }
     }
@@ -2984,4 +2987,34 @@ void CWallet::GetKeyBirthTimes(std::map<CKeyID, int64_t> &mapKeyBirth) const {
 
     for (std::map<CKeyID, CBlockIndex*>::const_iterator it = mapKeyFirstBlock.begin(); it != mapKeyFirstBlock.end(); it++)
         mapKeyBirth[it->first] = it->second->nTime - 7200;
+}
+
+bool CWallet::AddStealthAddress(const CStealthAddress& sxAddr)
+{
+    LOCK(cs_wallet);
+
+    std::string strEncoded = sxAddr.Encoded();
+    if (strEncoded.empty())
+        return false;
+
+    mapStealthAddresses[strEncoded] = sxAddr;
+
+    if (fFileBacked)
+    {
+        CWalletDB walletdb(strWalletFile);
+        if (!walletdb.WriteStealthAddress(sxAddr))
+            return false;
+    }
+    return true;
+}
+
+void CWallet::GetStealthAddresses(std::vector<CStealthAddress>& vStealthOut) const
+{
+    LOCK(cs_wallet);
+    vStealthOut.clear();
+    for (std::map<std::string, CStealthAddress>::const_iterator it = mapStealthAddresses.begin();
+         it != mapStealthAddresses.end(); ++it)
+    {
+        vStealthOut.push_back(it->second);
+    }
 }
