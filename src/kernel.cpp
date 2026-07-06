@@ -302,6 +302,7 @@ bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned 
 				nTimeBlockFrom, nTxPrevOffset, nTxPrevTime, prevout.n, nTryTime,
 				hashProofOfStake.ToString().c_str());
 		}
+		break;
 	}
 	mapHashedBlocks.clear();
 	mapHashedBlocks[nBestHeight] = GetTime();
