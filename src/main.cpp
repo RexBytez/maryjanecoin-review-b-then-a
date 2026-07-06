@@ -1398,7 +1398,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 
     if (IsProofOfWork())
     {
-        int64_t nReward = GetProofOfWorkReward(pindexBest->nHeight, nFees);
+        int64_t nReward = GetProofOfWorkReward(pindex->nHeight, nFees);
 
         if (vtx[0].GetValueOut() > nReward)
             return DoS(50, error("ConnectBlock() : coinbase reward exceeded (actual=%" PRId64 " vs calculated=%" PRId64 ")",
@@ -2558,7 +2558,7 @@ bool LoadBlockIndex(bool fAllowNew)
             return false;
         const char* pszTimestamp = "MaryJaneCoin Breaks The Internet - A Privacy PotCoin";
         CTransaction txNew;
-        txNew.nTime = 1775620800;
+        txNew.nTime = 1775447000;
         txNew.vin.resize(1);
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(42) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2568,11 +2568,11 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = 1775620800;
+        block.nTime    = 1775447000;
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 109264;
+        block.nNonce   = 134276;
 
-        assert(block.hashMerkleRoot == uint256("fbfd18f3c7efae5028ccc7af2ab23890303279659acf8c3dfec2b1a5daf188db"));
+        assert(block.hashMerkleRoot == uint256("4b0aae88f8f5a9769272bcd1a1e42ccf5cb7d60eb8e93e771913d53b7fc47075"));
         block.print();
         assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
 
