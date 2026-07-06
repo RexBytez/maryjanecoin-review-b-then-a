@@ -2,6 +2,13 @@
 #include "miner.h"
 #include "kernel.h"
 
+#ifdef ENABLE_MWEB
+#include "mw/mw_wallet.h"
+#include "mw/state/mw_state.h"
+extern mw::CMWState g_mwState;
+extern mw::CMWWallet g_mwWallet;
+#endif
+
 using namespace std;
 
 extern unsigned int nMinerSleep;
@@ -325,6 +332,20 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake, int64_t* pFees)
         if (pFees)
             *pFees = nFees;
 
+#ifdef ENABLE_MWEB
+
+        extern const int MWEB_ACTIVATION_HEIGHT;
+        if (MWEB_ACTIVATION_HEIGHT > 0 && (pindexBest->nHeight + 1) >= MWEB_ACTIVATION_HEIGHT)
+        {
+            if (!pblock->mwExtBlock.IsNull())
+            {
+                pblock->mwExtBlock.nHeight = pindexBest->nHeight + 1;
+                pblock->mwExtBlock.hashPrevMWBlock = g_mwState.GetLatestMWBlockHash();
+
+            }
+        }
+#endif
+
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
 
         pblock->nTime          = max(pblock->vtx[0].nTime, (unsigned int)(pindexPrev->GetBlockTime() + 1));
@@ -332,6 +353,14 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake, int64_t* pFees)
         pblock->nNonce         = 0;
 
         pblock->nVersion = CBlockHeader::CURRENT_VERSION;
+
+#ifdef ENABLE_MWEB
+
+        if (!pblock->mwExtBlock.IsNull())
+        {
+            pblock->nVersion |= 0x20000000;
+        }
+#endif
     }
 
     return pblock.release();

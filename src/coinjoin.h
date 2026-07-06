@@ -47,13 +47,13 @@ private:
     CWallet* pWallet;
     CoinJoinStatus nStatus;
 
-    int64_t FindBestDenomination(int64_t nAmount);
-
     bool SelectMixInputs(int64_t nDenomination, int nMinOutputs,
                          std::set<std::pair<const CWalletTx*, unsigned int> >& setCoins,
                          int64_t& nValueIn);
 
 public:
+
+    int64_t FindBestDenomination(int64_t nAmount);
     CCoinJoinMixer(CWallet* wallet);
 
     CCoinJoinResult MixAmount(int64_t nAmount);

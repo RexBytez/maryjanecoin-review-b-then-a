@@ -18,7 +18,6 @@
 #include "util.h"
 #include "walletdb.h"
 #include "stealth.h"
-#include "bip47.h"
 
 extern bool fConfChange;
 class CAccountingEntry;
@@ -81,6 +80,12 @@ public:
 	bool MintableCoins();
     mutable CCriticalSection cs_wallet;
 
+    bool fAutoMixEnabled;
+    mutable CCriticalSection cs_automix;
+    std::set<uint256> setAutoMixQueue;
+    int64_t nLastAutoMixTime;
+    int nAutoMixRounds;
+
     bool fFileBacked;
     std::string strWalletFile;
 	bool fWalletUnlockMintOnly;
@@ -128,6 +133,10 @@ public:
 		nHashDrift = 45;
 		nHashInterval = 22;
 
+        fAutoMixEnabled = true;
+        nLastAutoMixTime = 0;
+        nAutoMixRounds = 0;
+
 		vMultiSend.clear();
 		fMultiSend = false;
 		fMultiSendNotify = false;
@@ -155,6 +164,10 @@ public:
 		nHashDrift = 45;
 		nHashInterval = 22;
 
+        fAutoMixEnabled = true;
+        nLastAutoMixTime = 0;
+        nAutoMixRounds = 0;
+
 		vMultiSend.clear();
 		fMultiSend = false;
 		fMultiSendNotify = false;
@@ -178,13 +191,6 @@ public:
     int ScanBlockForStealthPayments(const CBlock& block);
 
     static bool IsStealthMandatory();
-
-    std::map<std::string, CPaymentChannel> mapPaymentChannels;
-
-    bool AddPaymentChannel(const CPaymentChannel& channel);
-    bool AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel);
-
-    void GetPaymentChannels(std::vector<CPaymentChannel>& vChannelsOut) const;
 
     CPubKey vchDefaultKey;
     int64_t nTimeFirstKey;
@@ -249,10 +255,37 @@ public:
     int64_t GetStake() const;
     int64_t GetNewMint() const;
 
+    int64_t GetTransparentBalance() const;
+    int64_t GetShieldedBalance() const;
+
+    bool SelectCoinsTransparentOnly(int64_t nTargetValue, unsigned int nSpendTime, int nMinConf,
+        std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const;
+
 	bool MultiSend();
     bool CreateTransaction(const std::vector<std::pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, int nSplitBlock, const CCoinControl *coinControl=NULL);
     bool CreateTransaction(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, const CCoinControl *coinControl=NULL);
+#ifdef ENABLE_MWEB
+
+    bool CreateMWEBPegInTransaction(int64_t nAmount, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, mw::CMWOwnedOutput& mwOutputOut);
+#endif
     bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
+
+    void QueueForAutoMix(const uint256& txHash);
+
+    static bool IsMixedDenomination(int64_t nValue);
+
+    int GetMixedUTXOCount() const;
+
+    int GetUnmixedUTXOCount() const;
+
+    bool DoAutoMixRound();
+
+    static void ThreadAutoMix(void* parg);
+
+    bool SelectCoinsPreferMixed(int64_t nTargetValue, unsigned int nSpendTime,
+                                std::set<std::pair<const CWalletTx*, unsigned int> >& setCoinsRet,
+                                int64_t& nValueRet,
+                                const CCoinControl* coinControl = NULL) const;
 
     bool GetStakeWeight(const CKeyStore& keystore, uint64_t& nMinWeight, uint64_t& nMaxWeight, uint64_t& nWeight);
 	bool GetStakeWeight2(const CKeyStore& keystore, uint64_t& nMinWeight, uint64_t& nMaxWeight, uint64_t& nWeight, uint64_t& nHoursToMaturity, uint64_t& nAmount);

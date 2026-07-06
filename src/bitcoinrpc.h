@@ -216,5 +216,8 @@ extern json_spirit::Value getnewstealthaddress(const json_spirit::Array& params,
 extern json_spirit::Value liststealthaddresses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendtostealthaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value scanstealthpayments(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value pegin(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value pegout(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getpoolbalances(const json_spirit::Array& params, bool fHelp);
 
 #endif

@@ -320,6 +320,10 @@ static const CRPCCommand vRPCCommands[] =
     { "liststealthaddresses",   &liststealthaddresses,   true,  false },
     { "sendtostealthaddress",   &sendtostealthaddress,   false, false },
     { "scanstealthpayments",    &scanstealthpayments,    false, false },
+
+    { "pegin",                  &pegin,                  false, false },
+    { "pegout",                 &pegout,                 false, false },
+    { "getpoolbalances",        &getpoolbalances,        true,  false },
 };
 
 CRPCTable::CRPCTable()

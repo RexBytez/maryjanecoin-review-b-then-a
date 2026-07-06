@@ -13,7 +13,7 @@
 #include "hashblock.h"
 
 #ifdef ENABLE_MWEB
-#include "mw/models/block.h"
+#include "mw/confidential.h"
 #endif
 
 #include <list>
@@ -46,6 +46,16 @@ static const int64_t MAX_MINT_PROOF_OF_STAKE = 1 * CENT;
 static const int MAX_TIME_SINCE_BEST_BLOCK = 10;
 static const int MODIFIER_INTERVAL_SWITCH = 20;
 static const int STEALTH_MANDATORY_HEIGHT = 1000;
+static const int RING_MIXING_MANDATORY_HEIGHT = 1500;
+
+static const int RING_MIXING_MIN_EQUAL_OUTPUTS = 3;
+
+static const int TWO_POOL_ACTIVATION_HEIGHT = 2000;
+
+enum PoolType {
+    POOL_TRANSPARENT = 0,
+    POOL_SHIELDED = 1,
+};
 
 inline bool MoneyRange(int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
@@ -417,6 +427,13 @@ public:
     std::vector<CTxOut> vout;
     unsigned int nLockTime;
 
+#ifdef ENABLE_MWEB
+
+    mw::CMWTransaction mwTx;
+
+    bool HasMWEB() const { return nVersion >= CT_TX_VERSION && !mwTx.IsNull(); }
+#endif
+
     mutable int nDoS;
     bool DoS(int nDoSIn, bool fIn) const { nDoS += nDoSIn; return fIn; }
 
@@ -433,6 +450,13 @@ public:
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
+#ifdef ENABLE_MWEB
+
+        if (this->nVersion >= CT_TX_VERSION)
+        {
+            READWRITE(mwTx);
+        }
+#endif
     )
 
     void SetNull()
@@ -443,6 +467,9 @@ public:
         vout.clear();
         nLockTime = 0;
         nDoS = 0;
+#ifdef ENABLE_MWEB
+        mwTx = mw::CMWTransaction();
+#endif
     }
 
     bool IsNull() const
@@ -640,6 +667,42 @@ inline bool HasStealthMarker(const CTransaction& tx)
         }
     }
     return false;
+}
+
+inline bool HasPegoutMarker(const CTransaction& tx)
+{
+    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    {
+        const CTxOut& txout = tx.vout[i];
+        if (txout.nValue == 0 &&
+            txout.scriptPubKey.size() == 8 &&
+            txout.scriptPubKey[0] == 0x6a &&
+            txout.scriptPubKey[1] == 0x06)
+        {
+
+            if (txout.scriptPubKey[2] == 'P' &&
+                txout.scriptPubKey[3] == 'E' &&
+                txout.scriptPubKey[4] == 'G' &&
+                txout.scriptPubKey[5] == 'O' &&
+                txout.scriptPubKey[6] == 'U' &&
+                txout.scriptPubKey[7] == 'T')
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+inline PoolType GetOutputPool(const CTransaction& tx)
+{
+    if (tx.IsCoinStake() || tx.IsCoinBase())
+        return POOL_TRANSPARENT;
+    if (HasPegoutMarker(tx))
+        return POOL_TRANSPARENT;
+    if (HasStealthMarker(tx))
+        return POOL_SHIELDED;
+    return POOL_TRANSPARENT;
 }
 
 class CMerkleTx : public CTransaction

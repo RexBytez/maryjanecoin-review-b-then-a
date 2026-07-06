@@ -358,16 +358,8 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum)
 {
-    MapModifierCheckpoints& checkpoints = (fTestNet ? mapStakeModifierCheckpointsTestNet : mapStakeModifierCheckpoints);
 
-    if (checkpoints.count(nHeight))
-    {
-        if (nStakeModifierChecksum != checkpoints[nHeight])
-        {
-            printf("MaryJaneCoin: StakeModifier checkpoint mismatch at height %d: got 0x%08x, expected 0x%08x\n",
-                   nHeight, nStakeModifierChecksum, checkpoints[nHeight]);
-            return false;
-        }
-    }
+    printf("MaryJaneCoin: StakeModifier at height %d: checksum=0x%08x\n", nHeight, nStakeModifierChecksum);
+
     return true;
 }

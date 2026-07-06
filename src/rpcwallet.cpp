@@ -108,6 +108,17 @@ Value getinfo(const Array& params, bool fHelp)
 	obj.push_back(Pair("staking status", (nStaking ? "Staking Active" : "Staking Not Active")));
     obj.push_back(Pair("stealth_mandatory", nBestHeight >= STEALTH_MANDATORY_HEIGHT));
     obj.push_back(Pair("stealth_activation_height", STEALTH_MANDATORY_HEIGHT));
+    obj.push_back(Pair("two_pool_active", nBestHeight >= TWO_POOL_ACTIVATION_HEIGHT));
+    obj.push_back(Pair("two_pool_activation_height", TWO_POOL_ACTIVATION_HEIGHT));
+    if (nBestHeight >= TWO_POOL_ACTIVATION_HEIGHT)
+    {
+        obj.push_back(Pair("transparent_balance", ValueFromAmount(pwalletMain->GetTransparentBalance())));
+        obj.push_back(Pair("shielded_balance", ValueFromAmount(pwalletMain->GetShieldedBalance())));
+    }
+
+    obj.push_back(Pair("ring_mixing_mandatory", nBestHeight >= RING_MIXING_MANDATORY_HEIGHT));
+    obj.push_back(Pair("ring_mixing_activation_height", RING_MIXING_MANDATORY_HEIGHT));
+    obj.push_back(Pair("automix_enabled", pwalletMain->fAutoMixEnabled));
 
     if (pwalletMain->IsCrypted())
         obj.push_back(Pair("unlocked_until", (boost::int64_t)nWalletUnlockTime / 1000));

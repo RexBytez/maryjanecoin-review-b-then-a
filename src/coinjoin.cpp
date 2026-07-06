@@ -107,7 +107,7 @@ CCoinJoinResult CCoinJoinMixer::MixAmount(int64_t nAmount)
             return result;
         }
         CKeyID keyID = newKey.GetID();
-        pWallet->SetAddressBookName(keyID, "coinjoin");
+        pWallet->SetAddressBookName(keyID, "automix");
 
         CScript scriptPubKey;
         scriptPubKey.SetDestination(keyID);

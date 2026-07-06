@@ -114,3 +114,52 @@ Value coinjoininfo(const Array& params, bool fHelp)
     obj.push_back(Pair("denominations", denomArray));
     return obj;
 }
+
+Value automixinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "automixinfo\n"
+            "Show auto-mix (ring mixing) status and UTXO mixing statistics.\n"
+            "Returns: {enabled, mixing_mandatory, activation_height, mixed_utxos, unmixed_utxos, rounds_completed}");
+
+    Object obj;
+    obj.push_back(Pair("enabled",             pwalletMain->fAutoMixEnabled));
+    obj.push_back(Pair("mixing_mandatory",    nBestHeight >= RING_MIXING_MANDATORY_HEIGHT));
+    obj.push_back(Pair("activation_height",   RING_MIXING_MANDATORY_HEIGHT));
+    obj.push_back(Pair("current_height",      nBestHeight));
+    obj.push_back(Pair("min_equal_outputs",   RING_MIXING_MIN_EQUAL_OUTPUTS));
+    obj.push_back(Pair("mixed_utxos",         pwalletMain->GetMixedUTXOCount()));
+    obj.push_back(Pair("unmixed_utxos",       pwalletMain->GetUnmixedUTXOCount()));
+    obj.push_back(Pair("rounds_completed",    pwalletMain->nAutoMixRounds));
+    obj.push_back(Pair("wallet_locked",       pwalletMain->IsLocked()));
+
+    return obj;
+}
+
+Value automix(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "automix <enable|disable>\n"
+            "Enable or disable background auto-mixing of received coins.\n"
+            "When enabled, the wallet automatically splits unmixed UTXOs into\n"
+            "standard denominations (1000/100/10/1 MARYJ) in the background.\n"
+            "This ensures coins are ready for privacy-preserving spending.");
+
+    string strCommand = params[0].get_str();
+    if (strCommand == "enable" || strCommand == "1" || strCommand == "true")
+    {
+        pwalletMain->fAutoMixEnabled = true;
+        return "Auto-mix enabled";
+    }
+    else if (strCommand == "disable" || strCommand == "0" || strCommand == "false")
+    {
+        pwalletMain->fAutoMixEnabled = false;
+        return "Auto-mix disabled";
+    }
+    else
+    {
+        throw runtime_error("automix <enable|disable>\nUse 'enable' or 'disable'.");
+    }
+}

@@ -7,6 +7,10 @@
 #include "kernel.h"
 #include "coincontrol.h"
 #include "dandelion.h"
+#include "coinjoin.h"
+#ifdef ENABLE_MWEB
+#include "mw/confidential.h"
+#endif
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
@@ -511,6 +515,22 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
 #endif
 
         WalletUpdateSpent(wtx, (wtxIn.hashBlock != 0));
+
+        if (fInsertedNew && fAutoMixEnabled && !wtx.IsCoinBase() && !wtx.IsCoinStake())
+        {
+            bool fHasUnmixedCredit = false;
+            for (unsigned int i = 0; i < wtx.vout.size(); i++)
+            {
+                if (IsMine(wtx.vout[i]) && wtx.vout[i].nValue > 0 &&
+                    !IsMixedDenomination(wtx.vout[i].nValue))
+                {
+                    fHasUnmixedCredit = true;
+                    break;
+                }
+            }
+            if (fHasUnmixedCredit)
+                QueueForAutoMix(hash);
+        }
 
         NotifyTransactionChanged(this, hash, fInsertedNew ? CT_NEW : CT_UPDATED);
 
@@ -1130,6 +1150,110 @@ int64_t CWallet::GetImmatureBalance() const
         }
     }
     return nTotal;
+}
+
+int64_t CWallet::GetTransparentBalance() const
+{
+    int64_t nTotal = 0;
+    {
+        LOCK(cs_wallet);
+        for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+        {
+            const CWalletTx* pcoin = &(*it).second;
+            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+                continue;
+
+            PoolType pool = GetOutputPool(*pcoin);
+            if (pool != POOL_TRANSPARENT)
+                continue;
+
+            for (unsigned int i = 0; i < pcoin->vout.size(); i++)
+            {
+                if (pcoin->IsSpent(i))
+                    continue;
+                if (!IsMine(pcoin->vout[i]))
+                    continue;
+                if (pcoin->vout[i].nValue == 0)
+                    continue;
+                nTotal += pcoin->vout[i].nValue;
+            }
+        }
+    }
+    return nTotal;
+}
+
+int64_t CWallet::GetShieldedBalance() const
+{
+    int64_t nTotal = 0;
+    {
+        LOCK(cs_wallet);
+        for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+        {
+            const CWalletTx* pcoin = &(*it).second;
+            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+                continue;
+
+            PoolType pool = GetOutputPool(*pcoin);
+            if (pool != POOL_SHIELDED)
+                continue;
+
+            for (unsigned int i = 0; i < pcoin->vout.size(); i++)
+            {
+                if (pcoin->IsSpent(i))
+                    continue;
+                if (!IsMine(pcoin->vout[i]))
+                    continue;
+                if (pcoin->vout[i].nValue == 0)
+                    continue;
+                nTotal += pcoin->vout[i].nValue;
+            }
+        }
+    }
+    return nTotal;
+}
+
+bool CWallet::SelectCoinsTransparentOnly(int64_t nTargetValue, unsigned int nSpendTime, int nMinConf,
+    set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
+{
+    vector<COutput> vCoins;
+    AvailableCoinsMinConf(vCoins, nMinConf);
+
+    setCoinsRet.clear();
+    nValueRet = 0;
+
+    BOOST_FOREACH(COutput output, vCoins)
+    {
+        const CWalletTx *pcoin = output.tx;
+        int i = output.i;
+
+        if (nValueRet >= nTargetValue)
+            break;
+
+        if (pcoin->nTime > nSpendTime)
+            continue;
+
+        PoolType pool = GetOutputPool(*pcoin);
+        if (pool != POOL_TRANSPARENT)
+            continue;
+
+        int64_t n = pcoin->vout[i].nValue;
+
+        pair<int64_t,pair<const CWalletTx*,unsigned int> > coin = make_pair(n,make_pair(pcoin, i));
+
+        if (n >= nTargetValue)
+        {
+            setCoinsRet.insert(coin.second);
+            nValueRet += coin.first;
+            break;
+        }
+        else if (n < nTargetValue + CENT)
+        {
+            setCoinsRet.insert(coin.second);
+            nValueRet += coin.first;
+        }
+    }
+
+    return true;
 }
 
 void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl) const
@@ -1833,6 +1957,13 @@ bool CWallet::MintableCoins()
 
 bool CWallet::SelectCoins(int64_t nTargetValue, unsigned int nSpendTime, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet, const CCoinControl* coinControl) const
 {
+
+    if (nBestHeight >= RING_MIXING_MANDATORY_HEIGHT && (!coinControl || !coinControl->HasSelected()))
+    {
+        if (SelectCoinsPreferMixed(nTargetValue, nSpendTime, setCoinsRet, nValueRet, coinControl))
+            return true;
+    }
+
     vector<COutput> vCoins;
     AvailableCoins(vCoins, true, coinControl);
 
@@ -2001,7 +2132,54 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 				if( nSplitBlock < 1 )
 					nSplitBlock = 1;
 
-                if (!fSplitBlock)
+                bool fRingMixingActive = (nBestHeight >= RING_MIXING_MANDATORY_HEIGHT);
+
+                if (fRingMixingActive && !fSplitBlock)
+                {
+
+                    BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
+                    {
+                        int64_t nSendValue = s.second;
+
+                        int64_t nBestDenom = 0;
+                        for (int d = 0; d < COINJOIN_NUM_DENOMINATIONS; d++)
+                        {
+                            if (nSendValue >= COINJOIN_DENOMINATIONS[d] * RING_MIXING_MIN_EQUAL_OUTPUTS)
+                            {
+                                nBestDenom = COINJOIN_DENOMINATIONS[d];
+                                break;
+                            }
+                        }
+
+                        if (nBestDenom > 0)
+                        {
+
+                            int nOutputCount = (int)(nSendValue / nBestDenom);
+                            if (nOutputCount > COINJOIN_MAX_OUTPUTS)
+                                nOutputCount = COINJOIN_MAX_OUTPUTS;
+
+                            int64_t nDenomTotal = nBestDenom * nOutputCount;
+                            int64_t nRemainder = nSendValue - nDenomTotal;
+
+                            for (int i = 0; i < nOutputCount; i++)
+                                wtxNew.vout.push_back(CTxOut(nBestDenom, s.first));
+
+                            if (nRemainder > 0)
+                                wtxNew.vout.push_back(CTxOut(nRemainder, s.first));
+                        }
+                        else
+                        {
+
+                            int64_t nEqualPart = nSendValue / RING_MIXING_MIN_EQUAL_OUTPUTS;
+                            int64_t nLastPart = nSendValue - (nEqualPart * (RING_MIXING_MIN_EQUAL_OUTPUTS - 1));
+
+                            for (int i = 0; i < RING_MIXING_MIN_EQUAL_OUTPUTS - 1; i++)
+                                wtxNew.vout.push_back(CTxOut(nEqualPart, s.first));
+                            wtxNew.vout.push_back(CTxOut(nLastPart, s.first));
+                        }
+                    }
+                }
+                else if (!fSplitBlock)
 				{
 				BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
 					wtxNew.vout.push_back(CTxOut(s.second, s.first));
@@ -2105,6 +2283,65 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, int64_t nValue, CWalletTx&
     vecSend.push_back(make_pair(scriptPubKey, nValue));
     return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, 1, coinControl);
 }
+
+#ifdef ENABLE_MWEB
+
+bool CWallet::CreateMWEBPegInTransaction(int64_t nAmount,
+                                          CWalletTx& wtxNew,
+                                          CReserveKey& reservekey,
+                                          int64_t& nFeeRet,
+                                          mw::CMWOwnedOutput& mwOutputOut)
+{
+    extern mw::CMWWallet g_mwWallet;
+
+    if (nAmount <= 0)
+        return false;
+
+    if (!g_mwWallet.HasKeys())
+    {
+        if (!g_mwWallet.GenerateKeys())
+            return false;
+    }
+
+    mw::CPegInResult pegResult = mw::CreatePegIn(this, nAmount);
+    if (!pegResult.fSuccess)
+    {
+        printf("CreateMWEBPegInTransaction() : peg-in failed: %s\n",
+               pegResult.strError.c_str());
+        return false;
+    }
+
+    CScript scriptMarker = mw::GetPegInMarkerScript(pegResult.mwOutput.commitment);
+
+    std::vector<std::pair<CScript, int64_t> > vecSend;
+    vecSend.push_back(std::make_pair(scriptMarker, 0));
+
+    nFeeRet = nAmount + MIN_TX_FEE;
+
+    if (!CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, 1, NULL))
+    {
+        printf("CreateMWEBPegInTransaction() : failed to create transparent TX\n");
+        return false;
+    }
+
+    wtxNew.nVersion = CT_TX_VERSION;
+
+    mw::CMWTransactionBody body;
+    body.vOutputs.push_back(pegResult.mwOutput);
+    body.vKernels.push_back(pegResult.kernel);
+
+    wtxNew.mwTx = mw::CMWTransaction(body, mw::BlindingFactor());
+
+    mwOutputOut.output = pegResult.mwOutput;
+    mwOutputOut.blindingFactor = pegResult.outputBlind;
+    mwOutputOut.nValue = nAmount;
+    mwOutputOut.nBlockHeight = 0;
+    mwOutputOut.fSpent = false;
+
+    printf("CreateMWEBPegInTransaction() : created peg-in TX for %" PRId64 " MARYJ\n", nAmount);
+    return true;
+}
+#endif
 
 bool CWallet::GetStakeWeight(const CKeyStore& keystore, uint64_t& nMinWeight, uint64_t& nMaxWeight, uint64_t& nWeight)
 {
@@ -2239,7 +2476,13 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     scriptEmpty.clear();
     txNew.vout.push_back(CTxOut(0, scriptEmpty));
 
-    int64_t nBalance = GetBalance();
+    int64_t nBalance;
+    bool fTwoPoolActive = (nBestHeight >= TWO_POOL_ACTIVATION_HEIGHT);
+    if (fTwoPoolActive)
+        nBalance = GetTransparentBalance();
+    else
+        nBalance = GetBalance();
+
     int64_t nReserveBalance = 0;
     if (mapArgs.count("-reservebalance") && !ParseMoney(mapArgs["-reservebalance"], nReserveBalance))
         return error("CreateCoinStake : invalid reserve balance amount");
@@ -2252,8 +2495,16 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     set<pair<const CWalletTx*,unsigned int> > setCoins;
     int64_t nValueIn = 0;
 
-    if (!SelectCoinsSimple(nBalance - nReserveBalance, txNew.nTime, nCoinbaseMaturity + 5, setCoins, nValueIn))
-        return false;
+    if (fTwoPoolActive)
+    {
+        if (!SelectCoinsTransparentOnly(nBalance - nReserveBalance, txNew.nTime, nCoinbaseMaturity + 5, setCoins, nValueIn))
+            return false;
+    }
+    else
+    {
+        if (!SelectCoinsSimple(nBalance - nReserveBalance, txNew.nTime, nCoinbaseMaturity + 5, setCoins, nValueIn))
+            return false;
+    }
 
     if (setCoins.empty())
         return false;
@@ -3425,39 +3676,272 @@ int CWallet::ScanBlockForStealthPayments(const CBlock& block)
     return nFound;
 }
 
-bool CWallet::AddPaymentChannel(const CPaymentChannel& channel)
+static const int64_t AUTOMIX_MIN_VALUE = 200000000LL;
+
+static const int AUTOMIX_INTERVAL = 60;
+
+static const int AUTOMIX_MAX_PER_ROUND = 3;
+
+bool CWallet::IsMixedDenomination(int64_t nValue)
 {
-    std::string strKey = channel.theirCode.ToBase58();
-    if (strKey.empty())
-        return false;
-    return AddPaymentChannel(strKey, channel);
+    for (int i = 0; i < COINJOIN_NUM_DENOMINATIONS; i++)
+    {
+        if (nValue == COINJOIN_DENOMINATIONS[i])
+            return true;
+    }
+    return false;
 }
 
-bool CWallet::AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel)
+void CWallet::QueueForAutoMix(const uint256& txHash)
 {
-    LOCK(cs_wallet);
-
-    if (strKey.empty())
-        return false;
-
-    mapPaymentChannels[strKey] = channel;
-
-    if (fFileBacked)
-    {
-        CWalletDB walletdb(strWalletFile);
-        if (!walletdb.WritePaymentChannel(channel))
-            return false;
-    }
-    return true;
+    LOCK(cs_automix);
+    setAutoMixQueue.insert(txHash);
+    printf("AutoMix: queued tx %s for background mixing\n",
+           txHash.ToString().substr(0,10).c_str());
 }
 
-void CWallet::GetPaymentChannels(std::vector<CPaymentChannel>& vChannelsOut) const
+int CWallet::GetMixedUTXOCount() const
 {
+    int nCount = 0;
     LOCK(cs_wallet);
-    vChannelsOut.clear();
-    for (std::map<std::string, CPaymentChannel>::const_iterator it = mapPaymentChannels.begin();
-         it != mapPaymentChannels.end(); ++it)
+    for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin();
+         it != mapWallet.end(); ++it)
     {
-        vChannelsOut.push_back(it->second);
+        const CWalletTx& wtx = it->second;
+        if (!wtx.IsFinal() || !wtx.IsConfirmed())
+            continue;
+        if (wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
+            continue;
+        if (wtx.IsCoinStake() && wtx.GetBlocksToMaturity() > 0)
+            continue;
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            if (wtx.IsSpent(i))
+                continue;
+            if (!IsMine(wtx.vout[i]))
+                continue;
+            if (IsMixedDenomination(wtx.vout[i].nValue))
+                nCount++;
+        }
     }
+    return nCount;
+}
+
+int CWallet::GetUnmixedUTXOCount() const
+{
+    int nCount = 0;
+    LOCK(cs_wallet);
+    for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin();
+         it != mapWallet.end(); ++it)
+    {
+        const CWalletTx& wtx = it->second;
+        if (!wtx.IsFinal() || !wtx.IsConfirmed())
+            continue;
+        if (wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
+            continue;
+        if (wtx.IsCoinStake() && wtx.GetBlocksToMaturity() > 0)
+            continue;
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            if (wtx.IsSpent(i))
+                continue;
+            if (!IsMine(wtx.vout[i]))
+                continue;
+            if (wtx.vout[i].nValue >= AUTOMIX_MIN_VALUE &&
+                !IsMixedDenomination(wtx.vout[i].nValue))
+                nCount++;
+        }
+    }
+    return nCount;
+}
+
+bool CWallet::DoAutoMixRound()
+{
+    if (IsLocked())
+        return false;
+
+    if (fWalletUnlockMintOnly)
+        return false;
+
+    vector<pair<int64_t, uint256> > vUnmixed;
+
+    {
+        LOCK(cs_wallet);
+        for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin();
+             it != mapWallet.end(); ++it)
+        {
+            const CWalletTx& wtx = it->second;
+            if (!wtx.IsFinal() || !wtx.IsConfirmed())
+                continue;
+            if (wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
+                continue;
+            if (wtx.IsCoinStake() && wtx.GetBlocksToMaturity() > 0)
+                continue;
+
+            if (wtx.GetDepthInMainChain() < 1)
+                continue;
+
+            for (unsigned int i = 0; i < wtx.vout.size(); i++)
+            {
+                if (wtx.IsSpent(i))
+                    continue;
+                if (!IsMine(wtx.vout[i]))
+                    continue;
+                int64_t nValue = wtx.vout[i].nValue;
+                if (nValue >= AUTOMIX_MIN_VALUE && !IsMixedDenomination(nValue))
+                {
+                    vUnmixed.push_back(make_pair(nValue, it->first));
+                }
+            }
+        }
+    }
+
+    if (vUnmixed.empty())
+        return false;
+
+    sort(vUnmixed.begin(), vUnmixed.end(), greater<pair<int64_t, uint256> >());
+
+    int nMixed = 0;
+    CCoinJoinMixer mixer(this);
+
+    for (unsigned int idx = 0; idx < vUnmixed.size() && nMixed < AUTOMIX_MAX_PER_ROUND; idx++)
+    {
+        int64_t nValue = vUnmixed[idx].first;
+
+        int64_t nBestDenom = mixer.FindBestDenomination(nValue);
+        if (nBestDenom == 0)
+            continue;
+
+        int nOutputs = (int)(nValue / nBestDenom);
+        if (nOutputs > COINJOIN_MAX_OUTPUTS)
+            nOutputs = COINJOIN_MAX_OUTPUTS;
+        if (nOutputs < COINJOIN_MIN_OUTPUTS)
+            continue;
+
+        int64_t nMixAmount = nBestDenom * nOutputs;
+
+        printf("AutoMix: mixing %s MARYJ into %d outputs of %s each\n",
+               FormatMoney(nMixAmount).c_str(), nOutputs,
+               FormatMoney(nBestDenom).c_str());
+
+        CCoinJoinResult result = mixer.MixAmount(nMixAmount);
+        if (result.success)
+        {
+            nMixed++;
+            {
+                LOCK(cs_automix);
+                nAutoMixRounds++;
+            }
+            printf("AutoMix: successfully mixed tx %s (%d inputs -> %d outputs of %s, fee %s)\n",
+                   result.txHash.ToString().substr(0,10).c_str(),
+                   result.numInputs, result.numOutputs,
+                   FormatMoney(result.denomination).c_str(),
+                   FormatMoney(result.feePaid).c_str());
+        }
+        else
+        {
+            printf("AutoMix: mix failed: %s\n", result.error.c_str());
+        }
+    }
+
+    {
+        LOCK(cs_automix);
+        setAutoMixQueue.clear();
+    }
+
+    return nMixed > 0;
+}
+
+void CWallet::ThreadAutoMix(void* parg)
+{
+    CWallet* pwallet = (CWallet*)parg;
+    printf("AutoMix: background thread started\n");
+
+    MilliSleep(30000);
+
+    while (!fShutdown)
+    {
+
+        for (int i = 0; i < AUTOMIX_INTERVAL && !fShutdown; i++)
+            MilliSleep(1000);
+
+        if (fShutdown)
+            break;
+
+        if (!pwallet->fAutoMixEnabled)
+            continue;
+
+        if (pwallet->IsLocked())
+            continue;
+
+        if (pwallet->fWalletUnlockMintOnly)
+            continue;
+
+        bool fHasUnmixed = false;
+        {
+            LOCK(pwallet->cs_automix);
+            fHasUnmixed = !pwallet->setAutoMixQueue.empty();
+        }
+
+        if (!fHasUnmixed)
+            fHasUnmixed = (pwallet->GetUnmixedUTXOCount() > 0);
+
+        if (!fHasUnmixed)
+            continue;
+
+        pwallet->nLastAutoMixTime = GetTime();
+        pwallet->DoAutoMixRound();
+    }
+
+    printf("AutoMix: background thread stopped\n");
+}
+
+bool CWallet::SelectCoinsPreferMixed(int64_t nTargetValue, unsigned int nSpendTime,
+                                      set<pair<const CWalletTx*, unsigned int> >& setCoinsRet,
+                                      int64_t& nValueRet,
+                                      const CCoinControl* coinControl) const
+{
+    setCoinsRet.clear();
+    nValueRet = 0;
+
+    vector<COutput> vCoins;
+    AvailableCoins(vCoins, true, coinControl);
+
+    if (vCoins.empty())
+        return false;
+
+    vector<COutput> vMixed;
+    vector<COutput> vUnmixed;
+
+    BOOST_FOREACH(const COutput& out, vCoins)
+    {
+        if (IsMixedDenomination(out.tx->vout[out.i].nValue))
+            vMixed.push_back(out);
+        else
+            vUnmixed.push_back(out);
+    }
+
+    int64_t nMixedTotal = 0;
+    set<pair<const CWalletTx*, unsigned int> > setMixedCoins;
+
+    sort(vMixed.begin(), vMixed.end(),
+         [](const COutput& a, const COutput& b) {
+             return a.tx->vout[a.i].nValue > b.tx->vout[b.i].nValue;
+         });
+
+    for (unsigned int idx = 0; idx < vMixed.size(); idx++)
+    {
+        const COutput& out = vMixed[idx];
+        int64_t nValue = out.tx->vout[out.i].nValue;
+        setMixedCoins.insert(make_pair(out.tx, out.i));
+        nMixedTotal += nValue;
+        if (nMixedTotal >= nTargetValue)
+        {
+            setCoinsRet = setMixedCoins;
+            nValueRet = nMixedTotal;
+            return true;
+        }
+    }
+
+    return false;
 }

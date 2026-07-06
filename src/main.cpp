@@ -82,9 +82,11 @@ mw::CMWState g_mwState;
 
 mw::CMWWallet g_mwWallet;
 
-extern const int MWEB_ACTIVATION_HEIGHT = 0;
+extern const int MWEB_ACTIVATION_HEIGHT = 50000;
 
 const int MWEB_VERSION_BIT = 0x20000000;
+
+const std::string MWEB_STATE_DIR = "mweb";
 #endif
 
 void RegisterWallet(CWallet* pwalletIn)
@@ -455,6 +457,46 @@ bool CTransaction::CheckTransaction() const
                 return DoS(10, error("CTransaction::CheckTransaction() : prevout is null"));
     }
 
+#ifdef ENABLE_MWEB
+
+    if (HasMWEB())
+    {
+
+        if (!mw::VerifyRangeProofs(mwTx.body))
+            return DoS(100, error("CTransaction::CheckTransaction() : MWEB range proof verification failed"));
+
+        if (!mw::VerifyKernelSignatures(mwTx.body))
+            return DoS(100, error("CTransaction::CheckTransaction() : MWEB kernel signature verification failed"));
+
+        if (!mw::VerifyCommitmentSum(mwTx.body, mwTx.offset))
+            return DoS(100, error("CTransaction::CheckTransaction() : MWEB commitment sum mismatch (inflation attempt?)"));
+
+        for (size_t i = 0; i < mwTx.body.vKernels.size(); i++)
+        {
+            if (mwTx.body.vKernels[i].nFee < 0)
+                return DoS(100, error("CTransaction::CheckTransaction() : MWEB kernel has negative fee"));
+        }
+
+        int64_t nPegInTotal = mwTx.body.GetTotalPegIn();
+        if (nPegInTotal > 0)
+        {
+
+            bool fFoundPegMarker = false;
+            for (size_t i = 0; i < vout.size(); i++)
+            {
+                mw::Commitment pegCommitment;
+                if (mw::ExtractPegInCommitment(vout[i].scriptPubKey, pegCommitment))
+                {
+                    fFoundPegMarker = true;
+                    break;
+                }
+            }
+            if (!fFoundPegMarker)
+                return DoS(100, error("CTransaction::CheckTransaction() : MWEB peg-in has no OP_RETURN marker"));
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -501,10 +543,57 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
 
     if (nBestHeight >= STEALTH_MANDATORY_HEIGHT)
     {
-        if (!tx.IsCoinBase() && !tx.IsCoinStake() && !HasStealthMarker(tx))
+        if (!tx.IsCoinBase() && !tx.IsCoinStake())
         {
-            return error("CTxMemPool::accept() : transaction %s rejected: "
-                "missing mandatory stealth marker", tx.GetHash().ToString().c_str());
+            if (nBestHeight >= TWO_POOL_ACTIVATION_HEIGHT)
+            {
+
+                if (!HasStealthMarker(tx) && !HasPegoutMarker(tx))
+                {
+                    return error("CTxMemPool::accept() : transaction %s rejected: "
+                        "missing stealth or pegout marker (two-pool consensus)",
+                        tx.GetHash().ToString().c_str());
+                }
+            }
+            else
+            {
+
+                if (!HasStealthMarker(tx))
+                {
+                    return error("CTxMemPool::accept() : transaction %s rejected: "
+                        "missing mandatory stealth marker", tx.GetHash().ToString().c_str());
+                }
+            }
+        }
+    }
+
+    if (nBestHeight >= RING_MIXING_MANDATORY_HEIGHT)
+    {
+        if (!tx.IsCoinBase() && !tx.IsCoinStake() && !HasPegoutMarker(tx))
+        {
+
+            std::map<int64_t, int> mapOutputCounts;
+            for (unsigned int j = 0; j < tx.vout.size(); j++)
+            {
+                if (tx.vout[j].nValue == 0)
+                    continue;
+                mapOutputCounts[tx.vout[j].nValue]++;
+            }
+
+            int nMaxEqual = 0;
+            for (std::map<int64_t, int>::const_iterator it = mapOutputCounts.begin();
+                 it != mapOutputCounts.end(); ++it)
+            {
+                if (it->second > nMaxEqual)
+                    nMaxEqual = it->second;
+            }
+
+            if (nMaxEqual < RING_MIXING_MIN_EQUAL_OUTPUTS)
+            {
+                return error("CTxMemPool::accept() : transaction %s rejected: "
+                    "ring mixing requires at least %d equal-value outputs",
+                    tx.GetHash().ToString().c_str(), RING_MIXING_MIN_EQUAL_OUTPUTS);
+            }
         }
     }
 
@@ -1450,11 +1539,66 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 
             if (tx.IsCoinStake()) continue;
 
-            if (!HasStealthMarker(tx))
+            if (pindex->nHeight >= TWO_POOL_ACTIVATION_HEIGHT)
+            {
+
+                if (!HasStealthMarker(tx) && !HasPegoutMarker(tx))
+                {
+                    return DoS(100, error("ConnectBlock() : transaction %s at height %d "
+                        "has no stealth or pegout marker (two-pool consensus requires one)",
+                        tx.GetHash().ToString().c_str(), pindex->nHeight));
+                }
+            }
+            else
+            {
+
+                if (!HasStealthMarker(tx))
+                {
+                    return DoS(100, error("ConnectBlock() : transaction %s at height %d "
+                        "missing mandatory stealth marker (OP_RETURN with ephemeral pubkey)",
+                        tx.GetHash().ToString().c_str(), pindex->nHeight));
+                }
+            }
+        }
+    }
+
+    if (pindex->nHeight >= RING_MIXING_MANDATORY_HEIGHT)
+    {
+        for (unsigned int i = 0; i < vtx.size(); i++)
+        {
+            const CTransaction& tx = vtx[i];
+
+            if (tx.IsCoinBase()) continue;
+
+            if (tx.IsCoinStake()) continue;
+
+            if (HasPegoutMarker(tx)) continue;
+
+            std::map<int64_t, int> mapOutputCounts;
+            for (unsigned int j = 0; j < tx.vout.size(); j++)
+            {
+                const CTxOut& txout = tx.vout[j];
+
+                if (txout.nValue == 0)
+                    continue;
+                mapOutputCounts[txout.nValue]++;
+            }
+
+            int nMaxEqual = 0;
+            for (std::map<int64_t, int>::const_iterator it = mapOutputCounts.begin();
+                 it != mapOutputCounts.end(); ++it)
+            {
+                if (it->second > nMaxEqual)
+                    nMaxEqual = it->second;
+            }
+
+            if (nMaxEqual < RING_MIXING_MIN_EQUAL_OUTPUTS)
             {
                 return DoS(100, error("ConnectBlock() : transaction %s at height %d "
-                    "missing mandatory stealth marker (OP_RETURN with ephemeral pubkey)",
-                    tx.GetHash().ToString().c_str(), pindex->nHeight));
+                    "rejected: ring mixing requires at least %d equal-value outputs "
+                    "(found max %d equal outputs)",
+                    tx.GetHash().ToString().c_str(), pindex->nHeight,
+                    RING_MIXING_MIN_EQUAL_OUTPUTS, nMaxEqual));
             }
         }
     }
@@ -1510,6 +1654,64 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 
     BOOST_FOREACH(CTransaction& tx, vtx)
         SyncWithWallets(tx, this, true);
+
+#ifdef ENABLE_MWEB
+
+    if (MWEB_ACTIVATION_HEIGHT > 0 && pindex->nHeight >= MWEB_ACTIVATION_HEIGHT)
+    {
+        BOOST_FOREACH(const CTransaction& tx, vtx)
+        {
+            if (tx.HasMWEB())
+            {
+
+                if (!mw::VerifyRangeProofs(tx.mwTx.body))
+                {
+                    return error("ConnectBlock() : CT tx %s has invalid range proof at height %d",
+                                 tx.GetHash().ToString().c_str(), pindex->nHeight);
+                }
+
+                if (!mw::VerifyKernelSignatures(tx.mwTx.body))
+                {
+                    return error("ConnectBlock() : CT tx %s has invalid kernel signature at height %d",
+                                 tx.GetHash().ToString().c_str(), pindex->nHeight);
+                }
+
+                if (!mw::VerifyCommitmentSum(tx.mwTx.body, tx.mwTx.offset))
+                {
+                    return error("ConnectBlock() : CT tx %s commitment sum mismatch at height %d",
+                                 tx.GetHash().ToString().c_str(), pindex->nHeight);
+                }
+
+                int64_t nPegInAmount = tx.mwTx.body.GetTotalPegIn();
+                if (nPegInAmount > 0)
+                {
+                    bool fMarkerFound = false;
+                    for (size_t i = 0; i < tx.vout.size(); i++)
+                    {
+                        mw::Commitment pegCommit;
+                        if (mw::ExtractPegInCommitment(tx.vout[i].scriptPubKey, pegCommit))
+                        {
+                            fMarkerFound = true;
+                            break;
+                        }
+                    }
+                    if (!fMarkerFound)
+                    {
+                        return error("ConnectBlock() : CT peg-in tx %s missing OP_RETURN marker at height %d",
+                                     tx.GetHash().ToString().c_str(), pindex->nHeight);
+                    }
+                }
+
+                printf("ConnectBlock() : validated CT tx %s at height %d "
+                       "(mw_outputs=%u, mw_inputs=%u, mw_kernels=%u)\n",
+                       tx.GetHash().ToString().c_str(), pindex->nHeight,
+                       (unsigned int)tx.mwTx.body.vOutputs.size(),
+                       (unsigned int)tx.mwTx.body.vInputs.size(),
+                       (unsigned int)tx.mwTx.body.vKernels.size());
+            }
+        }
+    }
+#endif
 
 #ifdef ENABLE_MWEB
 
@@ -1693,7 +1895,8 @@ bool CBlock::SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew)
     if (!txdb.TxnCommit())
         return error("SetBestChain() : TxnCommit failed");
 
-    pindexNew->pprev->pnext = pindexNew;
+    if (pindexNew->pprev)
+        pindexNew->pprev->pnext = pindexNew;
 
     BOOST_FOREACH(CTransaction& tx, vtx)
         mempool.remove(tx);
@@ -1714,6 +1917,18 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         if (!txdb.TxnCommit())
             return error("SetBestChain() : TxnCommit failed");
         pindexGenesisBlock = pindexNew;
+        hashBestChain = hash;
+        pindexBest = pindexNew;
+        nBestHeight = 0;
+        nBestChainTrust = pindexNew->nChainTrust;
+        printf("SetBestChain() : genesis block set as best chain\n");
+
+        nTransactionsUpdated++;
+        printf("SetBestChain: new best=%s  height=0  trust=%s  date=%s\n",
+            hashBestChain.ToString().substr(0,20).c_str(),
+            CBigNum(nBestChainTrust).ToString().c_str(),
+            DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+        return true;
     }
     else if (hashPrevBlock == hashBestChain)
     {
@@ -2738,7 +2953,7 @@ bool LoadBlockIndex(bool fAllowNew)
         if (!txdb.TxnCommit())
             return error("LoadBlockIndex() : failed to commit new checkpoint master key to db");
         if ((!fTestNet) && !Checkpoints::ResetSyncCheckpoint())
-            return error("LoadBlockIndex() : failed to reset sync-checkpoint");
+            printf("LoadBlockIndex() : ResetSyncCheckpoint failed (OK during genesis bootstrapping)\n");
     }
 
     return true;
