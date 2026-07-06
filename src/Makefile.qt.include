@@ -301,6 +301,27 @@ libmaryjanecoinqt_server_a_SOURCES = \
   rpcnet.cpp \
   rpcrawtransaction.cpp \
   rpcwallet.cpp \
+  rpcprivacy.cpp \
+  rpcpools.cpp \
+  rpccoinjoin.cpp \
+  rpcpayjoin.cpp \
+  rpcstealth.cpp \
+  dandelion.cpp \
+  torcontrol.cpp \
+  i2p.cpp \
+  stealth.cpp \
+  coinjoin.cpp \
+  payjoin.cpp \
+  bip47.cpp \
+  mw/mw_wallet.cpp \
+  mw/rpc_mw.cpp \
+  mw/crypto/pedersen.cpp \
+  mw/crypto/schnorr.cpp \
+  mw/crypto/bulletproofs.cpp \
+  mw/state/mmr.cpp \
+  mw/state/mw_state.cpp \
+  mw/validation.cpp \
+  mw/peg.cpp \
   script.cpp \
   scrypt.cpp \
   sync.cpp \

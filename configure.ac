@@ -1,6 +1,6 @@
 AC_PREREQ([2.69])
-define(_CLIENT_VERSION_MAJOR, 1)
-define(_CLIENT_VERSION_MINOR, 0)
+define(_CLIENT_VERSION_MAJOR, 4)
+define(_CLIENT_VERSION_MINOR, 2)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_CLIENT_VERSION_RC, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
@@ -135,6 +135,17 @@ AC_ARG_ENABLE([wallet],
   [disable wallet (enabled by default)])],
   [enable_wallet=$enableval],
   [enable_wallet=auto])
+
+AC_ARG_ENABLE([mweb],
+  [AS_HELP_STRING([--enable-mweb],
+  [enable MWEB (Mimblewimble Extension Blocks) support (default is no — half-implemented)])],
+  [enable_mweb=$enableval],
+  [enable_mweb=no])
+
+if test "$enable_mweb" = "yes"; then
+  AC_DEFINE([ENABLE_MWEB], [1], [Define to 1 to enable MWEB support])
+fi
+AM_CONDITIONAL([ENABLE_MWEB], [test "$enable_mweb" = "yes"])
 
 AC_ARG_WITH([sqlite],
   [AS_HELP_STRING([--with-sqlite=yes|no|auto],

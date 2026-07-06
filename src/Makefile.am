@@ -202,7 +202,28 @@ BITCOIN_CORE_H = \
   version.h \
   wallet.h \
   walletdb.h  \
-  util\macros.h
+  util\macros.h \
+  dandelion.h \
+  payjoin.h \
+  torcontrol.h \
+  i2p.h \
+  bip47.h \
+  stealth.h \
+  coinjoin.h \
+  mw/mw_common.h \
+  mw/mw_wallet.h \
+  mw/models/block.h \
+  mw/models/input.h \
+  mw/models/kernel.h \
+  mw/models/output.h \
+  mw/models/tx_body.h \
+  mw/crypto/bulletproofs.h \
+  mw/crypto/pedersen.h \
+  mw/crypto/schnorr.h \
+  mw/state/mmr.h \
+  mw/state/mw_state.h \
+  mw/validation.h \
+  mw/peg.h
 # T  addrdb.h \
 # T  addrman.h \
 # T  attributes.h \
@@ -452,6 +473,27 @@ libmaryjanecoin_server_a_SOURCES = \
   rpcnet.cpp \
   rpcrawtransaction.cpp \
   rpcwallet.cpp \
+  rpcprivacy.cpp \
+  rpcpools.cpp \
+  rpccoinjoin.cpp \
+  rpcpayjoin.cpp \
+  rpcstealth.cpp \
+  dandelion.cpp \
+  torcontrol.cpp \
+  i2p.cpp \
+  stealth.cpp \
+  coinjoin.cpp \
+  payjoin.cpp \
+  bip47.cpp \
+  mw/mw_wallet.cpp \
+  mw/rpc_mw.cpp \
+  mw/crypto/pedersen.cpp \
+  mw/crypto/schnorr.cpp \
+  mw/crypto/bulletproofs.cpp \
+  mw/state/mmr.cpp \
+  mw/state/mw_state.cpp \
+  mw/validation.cpp \
+  mw/peg.cpp \
   script.cpp \
   scrypt.cpp \
   sync.cpp \
