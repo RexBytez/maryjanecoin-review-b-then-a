@@ -1450,14 +1450,15 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
     if (MWEB_ACTIVATION_HEIGHT > 0 && pindex->nHeight >= MWEB_ACTIVATION_HEIGHT)
     {
 
-        printf("DisconnectBlock() : rolling back MWEB state at height %d\n", pindex->nHeight);
+        bool fNoMWChange = !((nVersion & MWEB_VERSION_BIT) && !mwExtBlock.IsNull());
+        printf("DisconnectBlock() : unwinding MWEB state at height %d (mw_change=%d)\n",
+               pindex->nHeight, fNoMWChange ? 0 : 1);
 
-        if (g_mwState.GetHeight() == pindex->nHeight)
+        if (!g_mwState.DisconnectBlock(pindex->GetBlockHash(), fNoMWChange))
         {
 
-            int32_t nPrevHeight = (pindex->pprev) ? pindex->pprev->nHeight : 0;
-            uint256 hashPrev = (pindex->pprev) ? pindex->pprev->GetBlockHash() : uint256(0);
-            g_mwState.SetLatestBlock(hashPrev, nPrevHeight);
+            return error("DisconnectBlock() : MWEB state unwind failed at height %d "
+                         "(undo missing/inconsistent — full resync required)", pindex->nHeight);
         }
     }
 #endif
@@ -1759,25 +1760,13 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                                  mwResult.strMessage.c_str());
                 }
 
-                for (size_t i = 0; i < mwBlock.body.vOutputs.size(); i++)
-                {
-                    g_mwState.AddOutput(mwBlock.body.vOutputs[i]);
-                }
-
-                for (size_t i = 0; i < mwBlock.body.vInputs.size(); i++)
-                {
-                    g_mwState.SpendOutput(mwBlock.body.vInputs[i].commitment);
-                }
-
-                for (size_t i = 0; i < mwBlock.body.vKernels.size(); i++)
-                {
-                    g_mwState.AddKernelExcess(mwBlock.body.vKernels[i].excess);
-                }
-
                 int64_t nSupplyDelta = mwBlock.GetTotalPegIn() - mwBlock.GetTotalPegOut();
-                g_mwState.AdjustSupply(nSupplyDelta);
 
-                g_mwState.SetLatestBlock(mwBlock.GetHash(), pindex->nHeight);
+                if (!g_mwState.ApplyBlock(mwBlock, pindex->nHeight, pindex->GetBlockHash(), nSupplyDelta))
+                {
+                    return error("ConnectBlock() : MWEB state apply failed at height %d "
+                                 "(block already applied?)", pindex->nHeight);
+                }
 
                 g_mwWallet.ScanForOutputs(mwBlock);
 
