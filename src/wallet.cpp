@@ -10,6 +10,9 @@
 #include "coinjoin.h"
 #ifdef ENABLE_MWEB
 #include "mw/confidential.h"
+
+#include "mw/mw_wallet.h"
+#include "mw/peg.h"
 #endif
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/range/algorithm.hpp>
@@ -2668,7 +2671,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             return error("CreateCoinStake : failed to calculate coin age");
 
         nReward = GetProofOfStakeReward(nCoinAge, nBits, txNew.nTime, nFees, nCredit, prevHash, nBestHeight + 1);
-        if (nReward < 0)
+        if (nReward <= 0)
             return false;
 
         nCredit += nReward;
@@ -2717,6 +2720,27 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         }
     }
 
+    int nDevFundOutputCount = 0;
+    if (nBestHeight + 1 >= DEV_FUND_FEE_ACTIVATION_HEIGHT)
+    {
+        int64_t nDevFundCut = GetDevFundCut(nFees);
+        if (nDevFundCut > nReward) nDevFundCut = nReward;
+        if (nDevFundCut > 0)
+        {
+            CScript devScript;
+            if (!GetDevFundScript(devScript))
+                return error("CreateCoinStake : dev-fund address not configured at/after activation height %d", DEV_FUND_FEE_ACTIVATION_HEIGHT);
+
+            txNew.vout.insert(txNew.vout.begin() + 1 + nCharityOutputCount, CTxOut(nDevFundCut, devScript));
+            nDevFundOutputCount = 1;
+            nCredit -= nDevFundCut;
+
+            if (fDebug && GetBoolArg("-printcoinstake"))
+                printf("CreateCoinStake: dev-fund output %s (20/420 of fees=%s)\n",
+                    FormatMoney(nDevFundCut).c_str(), FormatMoney(nFees).c_str());
+        }
+    }
+
     if (nCredit <= 0)
     {
         if (fDebug && GetBoolArg("-printcoinstake"))
@@ -2725,7 +2749,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         return false;
     }
 
-    int nFirstStakerOutput = 1 + nCharityOutputCount;
+    int nFirstStakerOutput = 1 + nCharityOutputCount + nDevFundOutputCount;
 
     if (nFirstStakerOutput >= (int)txNew.vout.size())
     {
@@ -3674,19 +3698,6 @@ int CWallet::ScanBlockForStealthPayments(const CBlock& block)
     }
 
     return nFound;
-}
-
-bool CWallet::AddPaymentChannel(const std::string& strKey, const CPaymentChannel& channel)
-{
-    LOCK(cs_wallet);
-    mapPaymentChannels[strKey] = channel;
-    if (fFileBacked)
-    {
-        CWalletDB walletdb(strWalletFile);
-        if (!walletdb.WritePaymentChannel(strKey, channel))
-            return false;
-    }
-    return true;
 }
 
 static const int64_t AUTOMIX_MIN_VALUE = 200000000LL;

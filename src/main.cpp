@@ -7,6 +7,7 @@
 #include "ui_interface.h"
 #include "kernel.h"
 #include "dandelion.h"
+#include "base58.h"
 #include "types/camount.h"
 
 #ifdef ENABLE_MWEB
@@ -989,6 +990,22 @@ int64_t GetProofOfStakeReward(int64_t nCoinAge, unsigned int nBits, unsigned int
     return nSubsidy + nFees;
 }
 
+int64_t GetDevFundCut(int64_t nFees)
+{
+    if (nFees <= 0)
+        return 0;
+    return (nFees * MARYJ_DEV_FUND_FEE_NUM) / MARYJ_DEV_FUND_FEE_DEN;
+}
+
+bool GetDevFundScript(CScript& scriptOut)
+{
+    CBitcoinAddress addr(MARYJ_DEV_FUND_ADDRESS);
+    if (!addr.IsValid())
+        return false;
+    scriptOut.SetDestination(addr.Get());
+    return true;
+}
+
 static const int nTargetTimespan = 60 * 60;
 static const int nTargetSpacingWorkMax = 3 * nStakeTargetSpacing;
 
@@ -1632,6 +1649,25 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 
         if (nStakeReward > nCalculatedStakeReward)
             return DoS(100, error("ConnectBlock() : coinstake pays too much(actual=%" PRId64 " vs calculated=%" PRId64 ")", nStakeReward, nCalculatedStakeReward));
+
+        if (pindex->nHeight >= DEV_FUND_FEE_ACTIVATION_HEIGHT)
+        {
+            int64_t nDevFundCut = GetDevFundCut(nFees);
+            if (nDevFundCut > 0)
+            {
+                CScript devScript;
+                if (!GetDevFundScript(devScript))
+                    return DoS(100, error("ConnectBlock() : dev-fund address not configured at/after activation height %d", DEV_FUND_FEE_ACTIVATION_HEIGHT));
+
+                int64_t nPaidToDevFund = 0;
+                for (unsigned int i = 0; i < vtx[1].vout.size(); i++)
+                    if (vtx[1].vout[i].scriptPubKey == devScript)
+                        nPaidToDevFund += vtx[1].vout[i].nValue;
+
+                if (nPaidToDevFund < nDevFundCut)
+                    return DoS(100, error("ConnectBlock() : coinstake underpays dev fund (paid=%" PRId64 " required=%" PRId64 ")", nPaidToDevFund, nDevFundCut));
+            }
+        }
     }
 
     pindex->nMint = nValueOut - nValueIn + nFees;

@@ -41,6 +41,21 @@ static const unsigned int MAX_INV_SZ = 50000;
 
 static const int64_t MIN_TX_FEE = 0.420 * COIN;
 static const int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
+
+static const int64_t MARYJ_DECOY_FEE    = 0.420 * COIN;
+static const int64_t MARYJ_STANDARD_FEE = 4.200 * COIN;
+static const int64_t MARYJ_BRIDGE_FEE   = 420 * COIN;
+
+static const int64_t MARYJ_DEV_FUND_FEE_NUM = 20;
+static const int64_t MARYJ_DEV_FUND_FEE_DEN = 420;
+
+static const int DEV_FUND_FEE_ACTIVATION_HEIGHT = 60000;
+
+#define MARYJ_DEV_FUND_ADDRESS "SET_REAL_2OF3_MULTISIG_ADDRESS_BEFORE_ACTIVATION"
+
+int64_t GetDevFundCut(int64_t nFees);
+
+bool GetDevFundScript(CScript& scriptOut);
 static const int64_t MAX_MONEY = 1000 * 1000000 * COIN;
 static const int64_t MAX_MINT_PROOF_OF_STAKE = 1 * CENT;
 static const int MAX_TIME_SINCE_BEST_BLOCK = 10;
