@@ -2976,3 +2976,92 @@ Value hashsettings(const Array& params, bool fHelp)
 	}
 	return false;
 }
+
+Value bridgetosol(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error(
+            "bridgetosol <amount> <solana_address>\n"
+            "Bridge MARYJ to Solana by sending to the configured escrow address\n"
+            "with an OP_RETURN containing the destination Solana address.\n"
+            "Requires bridgeescrow= to be set in MaryJaneCoin.conf.\n"
+            "Optional: bridgeminamount= sets minimum bridge amount (default 1.0)."
+            + HelpRequiringPassphrase());
+
+    int64_t nAmount = AmountFromValue(params[0]);
+
+    string strSolAddress = params[1].get_str();
+
+    if (strSolAddress.size() < 32 || strSolAddress.size() > 44)
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            "Invalid Solana address: must be 32-44 characters");
+
+    static const string base58chars =
+        "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    for (size_t i = 0; i < strSolAddress.size(); i++)
+    {
+        if (base58chars.find(strSolAddress[i]) == string::npos)
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                "Invalid Solana address: contains non-base58 character");
+    }
+
+    string strMinAmount = GetArg("-bridgeminamount", "1.0");
+    double dMinAmount = atof(strMinAmount.c_str());
+    if (dMinAmount <= 0) dMinAmount = 1.0;
+    int64_t nMinAmount = roundint64(dMinAmount * COIN);
+    if (nAmount < nMinAmount)
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            strprintf("Amount below minimum bridge amount of %s MARYJ",
+                      FormatMoney(nMinAmount).c_str()));
+
+    string strEscrow = GetArg("-bridgeescrow", "");
+    if (strEscrow.empty())
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            "bridgeescrow not set in MaryJaneCoin.conf. "
+            "Add bridgeescrow=<address> to your config file.");
+
+    CBitcoinAddress escrowAddress(strEscrow);
+    if (!escrowAddress.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+            "Invalid escrow address in config: " + strEscrow);
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+            "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    CWalletTx wtx;
+    wtx.mapValue["comment"] = "bridgetosol:" + strSolAddress;
+
+    CScript scriptEscrow;
+    scriptEscrow.SetDestination(escrowAddress.Get());
+
+    vector<unsigned char> vchSolAddr(strSolAddress.begin(), strSolAddress.end());
+    CScript scriptOpReturn;
+    scriptOpReturn << OP_RETURN << vchSolAddr;
+
+    vector<pair<CScript, int64_t> > vecSend;
+    vecSend.push_back(make_pair(scriptEscrow,   nAmount));
+    vecSend.push_back(make_pair(scriptOpReturn, (int64_t)0));
+
+    CReserveKey keyChange(pwalletMain);
+    int64_t nFeeRequired = 0;
+
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+    if (!fCreated)
+    {
+        if (nAmount + nFeeRequired > pwalletMain->GetBalance())
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
+    }
+
+    if (!pwalletMain->CommitTransaction(wtx, keyChange))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
+
+    Object result;
+    result.push_back(Pair("txid",            wtx.GetHash().GetHex()));
+    result.push_back(Pair("amount",          ValueFromAmount(nAmount)));
+    result.push_back(Pair("escrow_address",  strEscrow));
+    result.push_back(Pair("solana_address",  strSolAddress));
+
+    return result;
+}

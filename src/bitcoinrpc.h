@@ -186,6 +186,8 @@ extern json_spirit::Value getconfs(const json_spirit::Array& params, bool fHelp)
 extern json_spirit::Value multisend(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value hashsettings(const json_spirit::Array& params, bool fHelp);
 
+extern json_spirit::Value bridgetosol(const json_spirit::Array& params, bool fHelp);
+
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawtransaction(const json_spirit::Array& params, bool fHelp);
