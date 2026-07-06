@@ -16,9 +16,9 @@
 
 const QString BridgePage::ESCROW_ADDRESS = "SPoto81vBGGkUxUHjxyGQEtGoUsKBQZjpKaA2uj8Gvf";
 
-const QString POT_ESCROW_ADDRESS = "PSoLrqxK6Jia4gawpbMnkKs16tevP7pw5J";
+const QString MARYJ_ESCROW_ADDRESS = "MFqkH1fjMvYLLvNhce1BzRCgEQnjc8Lfxx";
 
-const QString POT_TOKEN_MINT = "PotzPaFGzK3cbu1u3g5HtoZbyTUkyhka8T2aBy8LMEq";
+const QString MARYJ_SPL_MINT = "MARYJkS2kHxmVkQp8baNUL7d3R1pddLr65GgsArJAYY";
 
 BridgePage::BridgePage(QWidget *parent) :
     QWidget(parent),
@@ -212,7 +212,7 @@ QString BridgePage::createMaryJaneCoinTransaction(const QString &solanaAddress, 
 
     int64_t nAmount = amount * COIN;
 
-    CBitcoinAddress address(POT_ESCROW_ADDRESS.toStdString());
+    CBitcoinAddress address(MARYJ_ESCROW_ADDRESS.toStdString());
     if (!address.IsValid()) {
         showErrorMessage(tr("Configuration Error"), tr("Invalid escrow address"));
         return QString();

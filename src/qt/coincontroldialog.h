@@ -41,6 +41,9 @@ private:
     QMenu *contextMenu;
     QTreeWidgetItem *contextMenuItem;
     QAction *copyTransactionHashAction;
+    QAction *freezeAction;
+    QAction *unfreezeAction;
+    QAction *setLabelAction;
 
     QString strPad(QString, int, QString);
     void sortView(int, Qt::SortOrder);
@@ -50,15 +53,17 @@ private:
     {
         COLUMN_CHECKBOX,
         COLUMN_AMOUNT,
-		COLUMN_CONFIRMATIONS,
-		COLUMN_AGE,
-		COLUMN_TIMEESTIMATE,
-		COLUMN_WEIGHT,
+        COLUMN_CONFIRMATIONS,
+        COLUMN_AGE,
+        COLUMN_TIMEESTIMATE,
+        COLUMN_WEIGHT,
         COLUMN_LABEL,
         COLUMN_ADDRESS,
         COLUMN_DATE,
         COLUMN_PRIORITY,
-		COLUMN_AGE_INT64,
+        COLUMN_PRIVACY_SCORE,
+        COLUMN_UTXO_LABEL,
+        COLUMN_AGE_INT64,
         COLUMN_TXHASH,
         COLUMN_VOUT_INDEX,
         COLUMN_AMOUNT_INT64,
@@ -71,7 +76,10 @@ private Q_SLOTS:
     void copyLabel();
     void copyAddress();
     void copyTransactionHash();
-
+    void freezeCoin();
+    void unfreezeCoin();
+    void setUtxoLabel();
+    void toggleDontConsolidate(bool fChecked);
     void clipboardQuantity();
     void clipboardAmount();
     void clipboardFee();

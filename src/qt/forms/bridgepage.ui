@@ -148,7 +148,7 @@
    <!-- Stacked Widget for Direction Content -->
    <item>
     <widget class="QStackedWidget" name="directionStack">
-     <!-- Page 0: POT to Solana -->
+     <!-- Page 0: MARYJ to Solana -->
      <widget class="QWidget" name="potToSolPage">
       <layout class="QVBoxLayout" name="potToSolLayout">
        <item>
@@ -207,7 +207,7 @@
        </item>
       </layout>
      </widget>
-     <!-- Page 1: Solana to POT -->
+     <!-- Page 1: Solana to MARYJ -->
      <widget class="QWidget" name="solToPotPage">
       <layout class="QVBoxLayout" name="solToPotLayout">
        <item>
@@ -239,7 +239,7 @@
           <item>
            <widget class="QLabel" name="tokenInfoLabel">
             <property name="text">
-             <string>&lt;html&gt;&lt;body&gt;&lt;p style='margin-left:20px; font-size:9pt;'&gt;Token Mint: &lt;b&gt;TBD&lt;/b&gt;&lt;br/&gt;Name: MaryJaneCoin (SPL MARYJ) · Decimals: 8&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>&lt;html&gt;&lt;body&gt;&lt;p style='margin-left:20px; font-size:9pt;'&gt;Token Mint: &lt;b&gt;MARYJkS2kHxmVkQp8baNUL7d3R1pddLr65GgsArJAYY&lt;/b&gt;&lt;br/&gt;Name: MaryJaneCoin (SPL MARYJ) · Decimals: 6&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="wordWrap">
              <bool>true</bool>

@@ -301,7 +301,7 @@ void BitcoinGUI::createActions()
 
     if (fBridgeEnabled) {
         bridgeAction = new QAction(QIcon(":/icons/bridge"), tr("&Bridge"), this);
-        bridgeAction->setToolTip(tr("Bridge POT to Solana"));
+        bridgeAction->setToolTip(tr("Bridge MARYJ to Solana"));
         bridgeAction->setCheckable(true);
         tabGroup->addAction(bridgeAction);
     } else {

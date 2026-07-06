@@ -21,6 +21,7 @@
 #include <QIcon>
 #include <QString>
 #include <QTreeWidget>
+#include <QInputDialog>
 #include <QTreeWidgetItem>
 
 using namespace std;
@@ -38,18 +39,28 @@ CoinControlDialog::CoinControlDialog(QWidget *parent) :
     QAction *copyLabelAction = new QAction(tr("Copy label"), this);
     QAction *copyAmountAction = new QAction(tr("Copy amount"), this);
              copyTransactionHashAction = new QAction(tr("Copy transaction ID"), this);
+             freezeAction = new QAction(tr("Freeze UTXO"), this);
+             unfreezeAction = new QAction(tr("Unfreeze UTXO"), this);
+             setLabelAction = new QAction(tr("Set Label..."), this);
 
     contextMenu = new QMenu();
     contextMenu->addAction(copyAddressAction);
     contextMenu->addAction(copyLabelAction);
     contextMenu->addAction(copyAmountAction);
     contextMenu->addAction(copyTransactionHashAction);
+    contextMenu->addSeparator();
+    contextMenu->addAction(freezeAction);
+    contextMenu->addAction(unfreezeAction);
+    contextMenu->addAction(setLabelAction);
 
     connect(ui->treeWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showMenu(QPoint)));
     connect(copyAddressAction, SIGNAL(triggered()), this, SLOT(copyAddress()));
     connect(copyLabelAction, SIGNAL(triggered()), this, SLOT(copyLabel()));
     connect(copyAmountAction, SIGNAL(triggered()), this, SLOT(copyAmount()));
     connect(copyTransactionHashAction, SIGNAL(triggered()), this, SLOT(copyTransactionHash()));
+    connect(freezeAction, SIGNAL(triggered()), this, SLOT(freezeCoin()));
+    connect(unfreezeAction, SIGNAL(triggered()), this, SLOT(unfreezeCoin()));
+    connect(setLabelAction, SIGNAL(triggered()), this, SLOT(setUtxoLabel()));
 
     QAction *clipboardQuantityAction = new QAction(tr("Copy quantity"), this);
     QAction *clipboardAmountAction = new QAction(tr("Copy amount"), this);
@@ -102,7 +113,9 @@ CoinControlDialog::CoinControlDialog(QWidget *parent) :
     ui->treeWidget->setColumnWidth(COLUMN_ADDRESS, 275);
     ui->treeWidget->setColumnWidth(COLUMN_DATE, 110);
     ui->treeWidget->setColumnWidth(COLUMN_PRIORITY, 100);
-	ui->treeWidget->setColumnHidden(COLUMN_AGE_INT64, true);
+    ui->treeWidget->setColumnWidth(COLUMN_PRIVACY_SCORE, 75);
+    ui->treeWidget->setColumnWidth(COLUMN_UTXO_LABEL, 120);
+    ui->treeWidget->setColumnHidden(COLUMN_AGE_INT64, true);
     ui->treeWidget->setColumnHidden(COLUMN_TXHASH, true);
     ui->treeWidget->setColumnHidden(COLUMN_VOUT_INDEX, true);
     ui->treeWidget->setColumnHidden(COLUMN_AMOUNT_INT64, true);
@@ -273,12 +286,26 @@ void CoinControlDialog::showMenu(const QPoint &point)
         if (item->text(COLUMN_TXHASH).length() == 64)
         {
             copyTransactionHashAction->setEnabled(true);
+            setLabelAction->setEnabled(true);
 
+            COutPoint outpt(uint256(item->text(COLUMN_TXHASH).toStdString()), item->text(COLUMN_VOUT_INDEX).toUInt());
+            if (coinControl->IsFrozen(outpt))
+            {
+                freezeAction->setEnabled(false);
+                unfreezeAction->setEnabled(true);
+            }
+            else
+            {
+                freezeAction->setEnabled(true);
+                unfreezeAction->setEnabled(false);
+            }
         }
         else
         {
             copyTransactionHashAction->setEnabled(false);
-
+            freezeAction->setEnabled(false);
+            unfreezeAction->setEnabled(false);
+            setLabelAction->setEnabled(false);
         }
 
         contextMenu->exec(QCursor::pos());
@@ -309,6 +336,58 @@ void CoinControlDialog::copyAddress()
 void CoinControlDialog::copyTransactionHash()
 {
     QApplication::clipboard()->setText(contextMenuItem->text(COLUMN_TXHASH));
+}
+
+void CoinControlDialog::freezeCoin()
+{
+    if (contextMenuItem->text(COLUMN_TXHASH).length() != 64)
+        return;
+
+    COutPoint outpt(uint256(contextMenuItem->text(COLUMN_TXHASH).toStdString()), contextMenuItem->text(COLUMN_VOUT_INDEX).toUInt());
+    coinControl->FreezeOutput(outpt);
+
+    if (contextMenuItem->checkState(COLUMN_CHECKBOX) == Qt::Checked)
+        contextMenuItem->setCheckState(COLUMN_CHECKBOX, Qt::Unchecked);
+    contextMenuItem->setDisabled(true);
+    contextMenuItem->setText(COLUMN_UTXO_LABEL, QString("[FROZEN] ") + coinControl->GetLabel(outpt).c_str());
+}
+
+void CoinControlDialog::unfreezeCoin()
+{
+    if (contextMenuItem->text(COLUMN_TXHASH).length() != 64)
+        return;
+
+    COutPoint outpt(uint256(contextMenuItem->text(COLUMN_TXHASH).toStdString()), contextMenuItem->text(COLUMN_VOUT_INDEX).toUInt());
+    coinControl->UnfreezeOutput(outpt);
+
+    contextMenuItem->setDisabled(false);
+    contextMenuItem->setText(COLUMN_UTXO_LABEL, coinControl->GetLabel(outpt).c_str());
+}
+
+void CoinControlDialog::setUtxoLabel()
+{
+    if (contextMenuItem->text(COLUMN_TXHASH).length() != 64)
+        return;
+
+    COutPoint outpt(uint256(contextMenuItem->text(COLUMN_TXHASH).toStdString()), contextMenuItem->text(COLUMN_VOUT_INDEX).toUInt());
+
+    bool fOk;
+    QString strLabel = QInputDialog::getText(this, tr("Set UTXO Label"),
+        tr("Label:"), QLineEdit::Normal, QString::fromStdString(coinControl->GetLabel(outpt)), &fOk);
+
+    if (fOk)
+    {
+        coinControl->SetLabel(outpt, strLabel.toStdString());
+        QString strDisplay = strLabel;
+        if (coinControl->IsFrozen(outpt))
+            strDisplay = "[FROZEN] " + strLabel;
+        contextMenuItem->setText(COLUMN_UTXO_LABEL, strDisplay);
+    }
+}
+
+void CoinControlDialog::toggleDontConsolidate(bool fChecked)
+{
+    coinControl->fDontConsolidate = fChecked;
 }
 
 void CoinControlDialog::clipboardQuantity()
@@ -742,6 +821,29 @@ void CoinControlDialog::updateView()
             itemOutput->setText(COLUMN_TXHASH, txhash.GetHex().c_str());
 
             itemOutput->setText(COLUMN_VOUT_INDEX, QString::number(out.i));
+
+            {
+                int nScore = CCoinControl::GetPrivacyScore(out.nDepth);
+                itemOutput->setText(COLUMN_PRIVACY_SCORE, QString::number(nScore));
+                if (nScore >= PRIVACY_SCORE_MEDIUM)
+                    itemOutput->setForeground(COLUMN_PRIVACY_SCORE, QColor(0, 160, 0));
+                else if (nScore >= PRIVACY_SCORE_POOR)
+                    itemOutput->setForeground(COLUMN_PRIVACY_SCORE, QColor(200, 160, 0));
+                else
+                    itemOutput->setForeground(COLUMN_PRIVACY_SCORE, QColor(200, 0, 0));
+            }
+
+            {
+                COutPoint outpt(txhash, out.i);
+                QString strUtxoLabel = QString::fromStdString(coinControl->GetLabel(outpt));
+                if (coinControl->IsFrozen(outpt))
+                {
+                    strUtxoLabel = "[FROZEN] " + strUtxoLabel;
+                    coinControl->UnSelect(outpt);
+                    itemOutput->setDisabled(true);
+                }
+                itemOutput->setText(COLUMN_UTXO_LABEL, strUtxoLabel);
+            }
 
             if (coinControl->IsSelected(txhash, out.i))
                 itemOutput->setCheckState(COLUMN_CHECKBOX,Qt::Checked);
