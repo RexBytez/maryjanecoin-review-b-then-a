@@ -44,7 +44,10 @@ static const int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const int64_t MARYJ_DECOY_FEE    = 0.420 * COIN;
 static const int64_t MARYJ_STANDARD_FEE = 4.200 * COIN;
+static const int64_t MARYJ_POOL_FEE     = 42.00 * COIN;
 static const int64_t MARYJ_BRIDGE_FEE   = 420 * COIN;
+
+static const int FEE_TIER_ACTIVATION_HEIGHT = 60000;
 
 static const int64_t MARYJ_DEV_FUND_FEE_NUM = 20;
 static const int64_t MARYJ_DEV_FUND_FEE_DEN = 420;
@@ -721,6 +724,50 @@ inline PoolType GetOutputPool(const CTransaction& tx)
     if (HasStealthMarker(tx))
         return POOL_SHIELDED;
     return POOL_TRANSPARENT;
+}
+
+inline bool HasBridgeMarker(const CTransaction& tx)
+{
+    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    {
+        const CTxOut& txout = tx.vout[i];
+        if (txout.nValue == 0 &&
+            txout.scriptPubKey.size() == 8 &&
+            txout.scriptPubKey[0] == 0x6a &&
+            txout.scriptPubKey[1] == 0x06)
+        {
+
+            if (txout.scriptPubKey[2] == 'B' &&
+                txout.scriptPubKey[3] == 'R' &&
+                txout.scriptPubKey[4] == 'I' &&
+                txout.scriptPubKey[5] == 'D' &&
+                txout.scriptPubKey[6] == 'G' &&
+                txout.scriptPubKey[7] == 'E')
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+inline int64_t GetTxTypeFeeFloor(const CTransaction& tx, int nHeight)
+{
+    if (nHeight < FEE_TIER_ACTIVATION_HEIGHT)
+        return 0;
+    if (tx.IsCoinBase() || tx.IsCoinStake())
+        return 0;
+    if (HasBridgeMarker(tx))
+        return MARYJ_BRIDGE_FEE;
+    bool fPegIn = false;
+#ifdef ENABLE_MWEB
+    fPegIn = (tx.HasMWEB() && tx.mwTx.body.GetTotalPegIn() > 0);
+#endif
+    if (HasPegoutMarker(tx) || fPegIn)
+        return MARYJ_POOL_FEE;
+    if (HasStealthMarker(tx))
+        return MARYJ_STANDARD_FEE;
+    return MARYJ_DECOY_FEE;
 }
 
 class CMerkleTx : public CTransaction

@@ -664,6 +664,10 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
         unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
 
         int64_t txMinFee = tx.GetMinFee(1000, GMF_RELAY, nSize);
+
+        int64_t txTierFee = GetTxTypeFeeFloor(tx, nBestHeight);
+        if (txTierFee > txMinFee)
+            txMinFee = txTierFee;
         if (nFees < txMinFee)
             return error("CTxMemPool::accept() : not enough fees %s, %" PRId64 " < %" PRId64,
                          hash.ToString().c_str(),
@@ -1368,6 +1372,10 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs, map<uint256, CTx
                 return DoS(100, error("ConnectInputs() : %s nTxFee < 0", GetHash().ToString().substr(0,10).c_str()));
 
             int64_t nMinFee = GetMinFee(1, GMF_BLOCK, 0);
+
+            int64_t nTierFee = GetTxTypeFeeFloor(*this, pindexBlock->nHeight);
+            if (nTierFee > nMinFee)
+                nMinFee = nTierFee;
             if (nTxFee < nMinFee)
                 return fBlock? DoS(100, error("ConnectInputs() : %s not paying required fee=%s, paid=%s", GetHash().ToString().substr(0,10).c_str(), FormatMoney(nMinFee).c_str(), FormatMoney(nTxFee).c_str())) : false;
 
