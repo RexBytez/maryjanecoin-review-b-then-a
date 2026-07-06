@@ -1,4 +1,3 @@
-#define BOOST_TEST_MODULE MaryJaneCoin_MWEB_Tests
 #include <boost/test/unit_test.hpp>
 
 #include <vector>

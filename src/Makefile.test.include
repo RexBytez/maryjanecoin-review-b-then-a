@@ -7,9 +7,15 @@ test_maryjanecoin_SOURCES = \
   test/transaction_record_tests.cpp \
   test/test_privacy.cpp \
   test/serialize_canonical_tests.cpp \
-  test/test_mweb.cpp \
   test/test_devfund.cpp \
   test/coinjoin_tests.cpp
+
+# test_mweb references mw:: symbols (PedersenContext/CMMR/CMWState) that only exist
+# in --enable-mweb builds; compile it only when MWEB is enabled, else the combined
+# test binary fails to link (undefined references) in the default --enable-mweb=no build.
+if ENABLE_MWEB
+test_maryjanecoin_SOURCES += test/test_mweb.cpp
+endif
 
 test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test -DENABLE_MWEB
 test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
