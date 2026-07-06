@@ -43,7 +43,8 @@ if [ "${BITCOIN_GENBUILD_NO_GIT}" != "1" ] && [ -e "$(command -v git)" ] && [ "$
                     GIT_BRANCH="$SANITIZED_BRANCH"
                 else
                     # If too long, just use first 17 chars + "..."
-                    GIT_BRANCH="${SANITIZED_BRANCH:0:17}..."
+                    # POSIX-safe (dash has no ${var:0:17} substring expansion; the Makefile runs this via #!/bin/sh)
+                    GIT_BRANCH="$(printf '%s' "$SANITIZED_BRANCH" | cut -c1-17)..."
                 fi
                 ;;
         esac
