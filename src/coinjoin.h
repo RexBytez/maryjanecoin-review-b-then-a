@@ -53,7 +53,7 @@ private:
 
 public:
 
-    int64_t FindBestDenomination(int64_t nAmount);
+    static int64_t FindBestDenomination(int64_t nAmount);
     CCoinJoinMixer(CWallet* wallet);
 
     CCoinJoinResult MixAmount(int64_t nAmount);

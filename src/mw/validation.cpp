@@ -5,6 +5,7 @@
 #include "mw/crypto/schnorr.h"
 #include "mw/crypto/bulletproofs.h"
 #include "util.h"
+#include "main.h"
 
 namespace mw {
 
@@ -174,6 +175,43 @@ CMWValidationResult ValidateMWBlock(
         return result;
     }
 
+    for (size_t i = 0; i < block.body.vKernels.size(); i++)
+    {
+        const CMWKernel& k = block.body.vKernels[i];
+
+        if (k.IsCoinbase())
+        {
+            result.error = MW_ERR_INVALID_KERNEL;
+            result.nKernelIndex = (int)i;
+            result.strMessage = "coinbase kernel not permitted (no emission rules defined)";
+            return result;
+        }
+        if (!MoneyRange(k.nFee))
+        {
+            result.error = MW_ERR_INVALID_FEE;
+            result.nKernelIndex = (int)i;
+            result.strMessage = "fee out of range";
+            return result;
+        }
+        if ((k.IsPegIn() || k.IsPegOut()) &&
+            (k.nPegAmount <= 0 || !MoneyRange(k.nPegAmount)))
+        {
+            result.error = MW_ERR_INVALID_KERNEL;
+            result.nKernelIndex = (int)i;
+            result.strMessage = "peg kernel amount out of range";
+            return result;
+        }
+    }
+
+    if (!MoneyRange(block.body.GetTotalFee()) ||
+        !MoneyRange(block.body.GetTotalPegIn()) ||
+        !MoneyRange(block.body.GetTotalPegOut()))
+    {
+        result.error = MW_ERR_INFLATION;
+        result.strMessage = "aggregate fee/peg amount out of range";
+        return result;
+    }
+
     if (!VerifyRangeProofs(block.body))
     {
         result.error = MW_ERR_INVALID_RANGEPROOF;
@@ -245,22 +283,6 @@ CMWValidationResult ValidateMWBlock(
             result.nKernelIndex = (int)i;
             result.strMessage = strprintf("kernel locked until height %d, current height %d",
                                           kernel.nLockHeight, nBlockHeight);
-            return result;
-        }
-
-        if (kernel.nFee < 0)
-        {
-            result.error = MW_ERR_INVALID_FEE;
-            result.nKernelIndex = (int)i;
-            result.strMessage = "negative fee";
-            return result;
-        }
-
-        if ((kernel.IsPegIn() || kernel.IsPegOut()) && kernel.nPegAmount <= 0)
-        {
-            result.error = MW_ERR_INVALID_KERNEL;
-            result.nKernelIndex = (int)i;
-            result.strMessage = "peg kernel with non-positive amount";
             return result;
         }
     }
@@ -344,12 +366,44 @@ CMWValidationResult ValidateMWTransaction(
     for (size_t i = 0; i < tx.body.vKernels.size(); i++)
     {
         const CMWKernel& kernel = tx.body.vKernels[i];
+
+        if (kernel.IsCoinbase())
+        {
+            result.error = MW_ERR_INVALID_KERNEL;
+            result.nKernelIndex = (int)i;
+            result.strMessage = "coinbase kernel not permitted (no emission rules defined)";
+            return result;
+        }
+
         if (kernel.IsHeightLocked() && kernel.nLockHeight > nBlockHeight)
         {
             result.error = MW_ERR_HEIGHT_LOCKED;
             result.nKernelIndex = (int)i;
             return result;
         }
+
+        if (!MoneyRange(kernel.nFee))
+        {
+            result.error = MW_ERR_INVALID_FEE;
+            result.nKernelIndex = (int)i;
+            return result;
+        }
+
+        if ((kernel.IsPegIn() || kernel.IsPegOut()) &&
+            (kernel.nPegAmount <= 0 || !MoneyRange(kernel.nPegAmount)))
+        {
+            result.error = MW_ERR_INVALID_KERNEL;
+            result.nKernelIndex = (int)i;
+            return result;
+        }
+    }
+
+    if (!MoneyRange(tx.body.GetTotalFee()) ||
+        !MoneyRange(tx.body.GetTotalPegIn()) ||
+        !MoneyRange(tx.body.GetTotalPegOut()))
+    {
+        result.error = MW_ERR_INFLATION;
+        return result;
     }
 
     return result;

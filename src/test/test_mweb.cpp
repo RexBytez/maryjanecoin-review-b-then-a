@@ -16,6 +16,7 @@
 #include "mw/models/block.h"
 #include "mw/state/mmr.h"
 #include "mw/state/mw_state.h"
+#include "mw/validation.h"
 #include "key.h"
 #include "uint256.h"
 #include "hash.h"
@@ -1035,6 +1036,65 @@ BOOST_AUTO_TEST_CASE(test_mwstate_100_clean_reorg_cycles)
 
     BOOST_CHECK(st.GetLatestMWBlockHash() == forkPrevMW);
     BOOST_CHECK_EQUAL(st.GetHeight(), forkHeight - 1);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(mweb_validation_hardening_tests)
+
+BOOST_AUTO_TEST_CASE(test_validate_rejects_coinbase_kernel)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::CMWState st;
+
+    std::vector<mw::Commitment> created, noSpend;
+    mw::CMWBlock blk = MakeMWBlock(50000, uint256(0), 0, noSpend, created);
+    blk.hashPrevMWBlock = st.GetLatestMWBlockHash();
+
+    mw::CMWKernel cb = MakeKernel(mw::KERNEL_COINBASE, 0);
+    cb.excess = ped.CommitBlind(ped.GenerateBlindingFactor());
+    blk.body.vKernels.push_back(cb);
+    blk.body.Sort();
+
+    mw::CMWValidationResult r = mw::ValidateMWBlock(blk, st, 50000, 0, 0);
+    BOOST_CHECK(!r.IsValid());
+    BOOST_CHECK_EQUAL(r.error, mw::MW_ERR_INVALID_KERNEL);
+}
+
+BOOST_AUTO_TEST_CASE(test_validate_rejects_fee_out_of_range)
+{
+    mw::CMWState st;
+
+    std::vector<mw::Commitment> created, noSpend;
+    mw::CMWBlock blk = MakeMWBlock(50000, uint256(0), 0, noSpend, created);
+    blk.hashPrevMWBlock = st.GetLatestMWBlockHash();
+
+    blk.body.vKernels[0].nFee = -1;
+    blk.body.Sort();
+
+    mw::CMWValidationResult r = mw::ValidateMWBlock(blk, st, 50000, 0, 0);
+    BOOST_CHECK(!r.IsValid());
+    BOOST_CHECK_EQUAL(r.error, mw::MW_ERR_INVALID_FEE);
+}
+
+BOOST_AUTO_TEST_CASE(test_validate_rejects_nonpositive_peg_amount)
+{
+    mw::crypto::PedersenContext& ped = mw::crypto::PedersenContext::Get();
+    mw::CMWState st;
+
+    std::vector<mw::Commitment> created, noSpend;
+    mw::CMWBlock blk = MakeMWBlock(50000, uint256(0), 0, noSpend, created);
+    blk.hashPrevMWBlock = st.GetLatestMWBlockHash();
+
+    mw::CMWKernel peg = MakeKernel(mw::KERNEL_PEGIN, 0);
+    peg.nPegAmount = 0;
+    peg.excess = ped.CommitBlind(ped.GenerateBlindingFactor());
+    blk.body.vKernels.push_back(peg);
+    blk.body.Sort();
+
+    mw::CMWValidationResult r = mw::ValidateMWBlock(blk, st, 50000, 0, 0);
+    BOOST_CHECK(!r.IsValid());
+    BOOST_CHECK_EQUAL(r.error, mw::MW_ERR_INVALID_KERNEL);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

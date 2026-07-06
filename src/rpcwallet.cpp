@@ -734,9 +734,13 @@ Value sendtoaddress(const Array& params, bool fHelp)
         CReserveKey keyChange(pwalletMain);
         int64_t nFeeRequired = 0;
 
-        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+        std::string strFailReason;
+        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1, NULL, &strFailReason);
         if (!fCreated)
         {
+
+            if (!strFailReason.empty())
+                throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
             if (nAmount + nFeeRequired > pwalletMain->GetBalance())
                 throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
             throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
@@ -1131,9 +1135,13 @@ Value sendfrom(const Array& params, bool fHelp)
         CReserveKey keyChange(pwalletMain);
         int64_t nFeeRequired = 0;
 
-        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+        std::string strFailReason;
+        bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1, NULL, &strFailReason);
         if (!fCreated)
         {
+
+            if (!strFailReason.empty())
+                throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
             if (nAmount + nFeeRequired > pwalletMain->GetBalance())
                 throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
             throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
@@ -1249,9 +1257,13 @@ Value sendmany(const Array& params, bool fHelp)
 
     CReserveKey keyChange(pwalletMain);
     int64_t nFeeRequired = 0;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+    std::string strFailReason;
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1, NULL, &strFailReason);
     if (!fCreated)
     {
+
+        if (!strFailReason.empty())
+            throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
         if (totalAmount + nFeeRequired > pwalletMain->GetBalance())
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
         throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
@@ -3046,9 +3058,13 @@ Value bridgetosol(const Array& params, bool fHelp)
     CReserveKey keyChange(pwalletMain);
     int64_t nFeeRequired = 0;
 
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1);
+    std::string strFailReason;
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, 1, NULL, &strFailReason);
     if (!fCreated)
     {
+
+        if (!strFailReason.empty())
+            throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
         if (nAmount + nFeeRequired > pwalletMain->GetBalance())
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
         throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");

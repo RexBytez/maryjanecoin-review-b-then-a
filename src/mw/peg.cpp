@@ -98,24 +98,43 @@ CPegInResult CreatePegIn(CWallet* pWallet, int64_t nAmount)
     {
 
         SecretKey senderSecret;
-        RAND_bytes(senderSecret.data, 32);
+        if (RAND_bytes(senderSecret.data, 32) != 1)
+        {
+            result.strError = "RNG failure generating sender key";
+            return result;
+        }
         if (!crypto::SchnorrSigner::GetPublicKey(senderSecret, senderPubKey))
         {
+            memory_cleanse(senderSecret.data, 32);
             result.strError = "failed to generate sender key";
             return result;
         }
 
         SecretKey receiverSecret;
-        RAND_bytes(receiverSecret.data, 32);
+        if (RAND_bytes(receiverSecret.data, 32) != 1)
+        {
+            memory_cleanse(senderSecret.data, 32);
+            result.strError = "RNG failure generating receiver key";
+            return result;
+        }
         if (!crypto::SchnorrSigner::GetPublicKey(receiverSecret, receiverPubKey))
         {
+            memory_cleanse(senderSecret.data, 32);
+            memory_cleanse(receiverSecret.data, 32);
             result.strError = "failed to generate receiver key";
             return result;
         }
+
+        memory_cleanse(senderSecret.data, 32);
+        memory_cleanse(receiverSecret.data, 32);
     }
 
     uint256 nonce;
-    RAND_bytes((unsigned char*)&nonce, 32);
+    if (RAND_bytes((unsigned char*)&nonce, 32) != 1)
+    {
+        result.strError = "RNG failure generating range-proof nonce";
+        return result;
+    }
     RangeProof rangeProof = crypto::BulletproofProver::Prove(nAmount, outputBlind, nonce);
     if (rangeProof.IsNull())
     {

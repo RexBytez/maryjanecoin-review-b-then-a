@@ -781,7 +781,8 @@ BOOST_AUTO_TEST_CASE(test_payjoin_tx_indistinguishable)
     txNormal.vout.push_back(CTxOut(70 * COIN, script3));
 
     BOOST_CHECK_EQUAL(txPayJoin.nVersion, txNormal.nVersion);
-    BOOST_CHECK_EQUAL(txPayJoin.nVersion, CTransaction::CURRENT_VERSION);
+
+    BOOST_CHECK_EQUAL(txPayJoin.nVersion, (int)CTransaction::CURRENT_VERSION);
 
     BOOST_CHECK_EQUAL(txPayJoin.vin.size(), txNormal.vin.size());
     BOOST_CHECK_EQUAL(txPayJoin.vout.size(), txNormal.vout.size());
@@ -1158,13 +1159,13 @@ BOOST_AUTO_TEST_CASE(test_bip47_blinding_roundtrip)
 
     uint256 blindingSecret = GetRandHash();
 
-    std::vector<unsigned char> vchBlinded = vchOriginal;
-    BOOST_REQUIRE(BlindPaymentCode(vchBlinded, blindingSecret));
+    std::vector<unsigned char> vchBlinded;
+    BOOST_REQUIRE(BlindPaymentCode(vchOriginal, blindingSecret, vchBlinded));
 
     BOOST_CHECK(vchBlinded != vchOriginal);
 
-    std::vector<unsigned char> vchUnblinded = vchBlinded;
-    BOOST_REQUIRE(UnblindPaymentCode(vchUnblinded, blindingSecret));
+    std::vector<unsigned char> vchUnblinded;
+    BOOST_REQUIRE(UnblindPaymentCode(vchBlinded, blindingSecret, vchUnblinded));
 
     BOOST_CHECK(vchUnblinded == vchOriginal);
 
@@ -1235,7 +1236,7 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(payjoin_tests)
 
-BOOST_AUTO_TEST_CASE(test_payjoin_constants)
+BOOST_AUTO_TEST_CASE(test_payjoin_constants_basic)
 {
     BOOST_CHECK(PAYJOIN_MAX_RECEIVER_INPUTS >= 1);
     BOOST_CHECK(PAYJOIN_MAX_RECEIVER_INPUTS <= 20);
@@ -1245,15 +1246,15 @@ BOOST_AUTO_TEST_CASE(test_payjoin_constants)
 
 BOOST_AUTO_TEST_CASE(test_payjoin_server_default_state)
 {
-    CPayJoinServer server;
+    CPayJoinServer server(NULL);
     BOOST_CHECK(!server.IsRunning());
     BOOST_CHECK_EQUAL(server.GetPort(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_payjoin_client_default_state)
 {
-    CPayJoinClient client;
-    BOOST_CHECK_EQUAL(client.GetStatus(), PAYJOIN_STATUS_NONE);
+    CPayJoinClient client(NULL);
+    BOOST_CHECK_EQUAL(client.GetStatus(), PAYJOIN_IDLE);
 }
 
 BOOST_AUTO_TEST_CASE(test_payjoin_validate_sender_inputs_present)

@@ -8,9 +8,9 @@ Version 4.2.0 · Released 2026-04 · [maryjanecoin.net](https://maryjanecoin.net
 
 ## Overview
 
-MaryJaneCoin is a privacy-focused Proof-of-Stake cryptocurrency that implements layered privacy at the network, wallet, and consensus levels. The chain is built on the Bitcoin → Peercoin → NovaCoin → MotaCoin lineage and introduces stealth addresses, ring mixing, a dual-pool architecture separating staking from spending, and Dandelion++ transaction relay.
+MaryJaneCoin is a privacy-focused Proof-of-Stake cryptocurrency that implements layered unlinkability at the network, wallet, and consensus levels. The chain is built on the Bitcoin → Peercoin → NovaCoin → MotaCoin lineage and introduces stealth addresses, denomination mixing (CoinJoin), a dual-pool architecture separating staking from spending, and Dandelion++ transaction relay. Transaction amounts are transparent on-chain; confidential amounts are a future feature (MWEB, block 50,000).
 
-MaryJaneCoin is the **first privacy blockchain to launch via pump.fun**. A 1:1 escrow bridge between a Solana SPL token and the native chain provides immediate DEX liquidity on Solana while allowing holders to bridge into the mainchain for full on-chain privacy.
+MaryJaneCoin is the **first privacy blockchain to launch via pump.fun**. A 1:1 escrow bridge between a Solana SPL token and the native chain provides immediate DEX liquidity on Solana while allowing holders to bridge into the mainchain for unlinkable on-chain transactions (amounts are transparent; confidential amounts activate with MWEB at block 50,000).
 
 The chain runs on a zero-inflation economic model: the entire 1 billion MARYJ supply is minted at genesis and held in bridge escrow. Block rewards are 0%. The network is secured by Proof-of-Stake and funded entirely by transaction fees.
 
@@ -119,7 +119,8 @@ src/                       Blockchain daemon and Qt wallet source
   qt/                      GUI wallet (bridge, coin control, staking status)
   rpc*.cpp                 JSON-RPC server
   kernel.cpp               Proof-of-Stake kernel
-  stealth/, ringct/        Privacy modules (stealth addresses, ring signatures)
+  stealth.cpp, bip47.cpp   Stealth addresses + BIP47 reusable payment codes
+  coinjoin.cpp, mw/        Denomination mixing + MWEB confidential transactions (dormant)
 contrib/                   Init scripts, Debian packaging, Guix build system
 depends/                   Cross-compilation dependency tree
 doc/                       Build instructions, release notes, coding guidelines
@@ -136,9 +137,9 @@ MaryJaneCoin activates its privacy features progressively at fixed block heights
 |-------|-------|--------|
 | Dandelion++ | Network-level TX relay obfuscation | Implemented |
 | Stealth addresses | One-time receiving addresses per payment | Implemented |
-| Ring signatures | Sender anonymity set on spending | Implemented |
-| Dual-pool architecture | Separates transparent staking from private spending | Implemented |
-| MWEB (future) | Extension-block confidential transactions | Roadmap |
+| Denomination mixing (CoinJoin) | Amount-correlation defense on spending (≥3 equal-value outputs) | Implemented |
+| Dual-pool architecture | Separates transparent staking from unlinkable spending (amounts visible) | Implemented |
+| MWEB confidential transactions | Pedersen commitments + Bulletproofs (extension blocks) | Implemented, dormant (block 50,000) |
 
 See the [whitepaper](https://whitepaper.maryjanecoin.net) for full cryptographic detail and activation schedule.
 

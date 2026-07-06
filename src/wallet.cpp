@@ -8,6 +8,7 @@
 #include "coincontrol.h"
 #include "dandelion.h"
 #include "coinjoin.h"
+#include "decoy.h"
 #ifdef ENABLE_MWEB
 #include "mw/confidential.h"
 
@@ -193,6 +194,17 @@ void CWallet::SetBestChain(const CBlockLocator& loc)
 {
     CWalletDB walletdb(strWalletFile);
     walletdb.WriteBestBlock(loc);
+
+    if (!loc.IsNull() && !loc.vHave.empty()) {
+        const uint256& tipHash = loc.vHave[0];
+        LOCK(cs_decoy);
+        map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(tipHash);
+        if (mi != mapBlockIndex.end()) {
+            hashDecoyPending      = tipHash;
+            nDecoyPendingHeight   = mi->second->nHeight;
+            fDecoyInjectionPending = true;
+        }
+    }
 }
 
 class CCorruptAddress
@@ -1947,6 +1959,24 @@ bool CWallet::SelectCoinsPrivacy(int64_t nTargetValue, unsigned int nSpendTime, 
 
 bool CWallet::MintableCoins()
 {
+
+    {
+        uint256 pendingHash;
+        int     pendingHeight = 0;
+        bool    fPending = false;
+        {
+            LOCK(cs_decoy);
+            if (fDecoyInjectionPending) {
+                pendingHash    = hashDecoyPending;
+                pendingHeight  = nDecoyPendingHeight;
+                fPending       = true;
+                fDecoyInjectionPending = false;
+            }
+        }
+        if (fPending)
+            MaybeInjectDecoys(pendingHash, pendingHeight);
+    }
+
 	vector<COutput> vCoins;
     AvailableCoins(vCoins, true);
 
@@ -2102,7 +2132,7 @@ bool CWallet::GetStakeWeightFromValue(const int64_t nTime, const int64_t nValue,
 	return true;
 }
 
-bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, int nSplitBlock, const CCoinControl* coinControl)
+bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, int nSplitBlock, const CCoinControl* coinControl, std::string* pstrFailReason)
 {
     int64_t nValue = 0;
     BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
@@ -2131,6 +2161,8 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 wtxNew.fFromMe = true;
 
                 int64_t nTotalValue = nValue + nFeeRet;
+
+                int64_t nRingMixRemainder = 0;
                 double dPriority = 0;
 				if( nSplitBlock < 1 )
 					nSplitBlock = 1;
@@ -2142,6 +2174,30 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                     BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
                     {
+                        if (s.second == 0 || (!s.first.empty() && s.first[0] == OP_RETURN))
+                            continue;
+                        if (s.second < (int64_t)RING_MIXING_MIN_EQUAL_OUTPUTS)
+                        {
+                            string strReason = strprintf(
+                                "Amount %s too small for mandatory ring mixing: needs at least %d "
+                                "equal outputs (minimum sendable %s MARYJ).",
+                                FormatMoney(s.second).c_str(), RING_MIXING_MIN_EQUAL_OUTPUTS,
+                                FormatMoney((int64_t)RING_MIXING_MIN_EQUAL_OUTPUTS).c_str());
+                            if (pstrFailReason)
+                                *pstrFailReason = strReason;
+                            return error("CreateTransaction: %s", strReason.c_str());
+                        }
+                    }
+
+                    BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
+                    {
+
+                        if (s.second == 0 || (!s.first.empty() && s.first[0] == OP_RETURN))
+                        {
+                            wtxNew.vout.push_back(CTxOut(s.second, s.first));
+                            continue;
+                        }
+
                         int64_t nSendValue = s.second;
 
                         int64_t nBestDenom = 0;
@@ -2168,17 +2224,23 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                                 wtxNew.vout.push_back(CTxOut(nBestDenom, s.first));
 
                             if (nRemainder > 0)
-                                wtxNew.vout.push_back(CTxOut(nRemainder, s.first));
+                            {
+                                if (nRemainder >= CENT)
+                                    wtxNew.vout.push_back(CTxOut(nRemainder, s.first));
+                                else
+                                    nRingMixRemainder += nRemainder;
+                            }
                         }
                         else
                         {
 
-                            int64_t nEqualPart = nSendValue / RING_MIXING_MIN_EQUAL_OUTPUTS;
-                            int64_t nLastPart = nSendValue - (nEqualPart * (RING_MIXING_MIN_EQUAL_OUTPUTS - 1));
+                            const int N = RING_MIXING_MIN_EQUAL_OUTPUTS;
+                            int64_t nEqualPart = nSendValue / N;
+                            int64_t nRem       = nSendValue - (nEqualPart * N);
 
-                            for (int i = 0; i < RING_MIXING_MIN_EQUAL_OUTPUTS - 1; i++)
+                            for (int i = 0; i < N; i++)
                                 wtxNew.vout.push_back(CTxOut(nEqualPart, s.first));
-                            wtxNew.vout.push_back(CTxOut(nLastPart, s.first));
+                            nRingMixRemainder += nRem;
                         }
                     }
                 }
@@ -2216,6 +2278,8 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 }
 
                 int64_t nChange = nValueIn - nValue - nFeeRet;
+
+                nChange += nRingMixRemainder;
 
                 if (nFeeRet < MIN_TX_FEE && nChange > 0 && nChange < CENT)
                 {
@@ -3968,4 +4032,107 @@ bool CWallet::SelectCoinsPreferMixed(int64_t nTargetValue, unsigned int nSpendTi
     }
 
     return false;
+}
+
+static const int64_t DECOY_OUTPUT_AMOUNT = 42000000LL;
+
+bool CWallet::BuildDecoyTransaction()
+{
+    if (IsLocked() || fWalletUnlockMintOnly)
+        return false;
+
+    if (GetBalance() < DECOY_OUTPUT_AMOUNT + MIN_TX_FEE * 2)
+        return false;
+
+    CReserveKey reservekey(this);
+    CPubKey vchPubKey = reservekey.GetReservedKey();
+    CScript scriptDecoy;
+    scriptDecoy.SetDestination(vchPubKey.GetID());
+
+    CWalletTx wtxDecoy;
+    wtxDecoy.BindWallet(this);
+
+    wtxDecoy.mapValue["decoy"] = "1";
+
+    CReserveKey reservekeyChange(this);
+    int64_t nFeeRet = 0;
+
+    if (!CreateTransaction(scriptDecoy, DECOY_OUTPUT_AMOUNT, wtxDecoy, reservekeyChange, nFeeRet)) {
+        reservekey.ReturnKey();
+        return false;
+    }
+    if (!CommitTransaction(wtxDecoy, reservekeyChange)) {
+        reservekey.ReturnKey();
+        return false;
+    }
+
+    reservekey.KeepKey();
+
+    {
+        LOCK(cs_decoy);
+        uint256 txHash = wtxDecoy.GetHash();
+        for (unsigned int i = 0; i < wtxDecoy.vout.size(); i++) {
+            if (wtxDecoy.vout[i].scriptPubKey == scriptDecoy) {
+                mapDecoyOutputs[txHash] = std::make_pair(i, nBestHeight);
+                break;
+            }
+        }
+    }
+
+    return true;
+}
+
+void CWallet::MaybeInjectDecoys(const uint256& blockHash, int nHeight)
+{
+
+    int level = nDecoyPrivacyLevel;
+    if (mapArgs.count("-decoylevel")) {
+        int arg = atoi(mapArgs["-decoylevel"].c_str());
+        level = (arg == 0) ? 0 : DecoyClampLevel(arg);
+    }
+    if (level == 0)
+        return;
+
+    {
+        LOCK(cs_decoy);
+        if (nDecoyWalletSalt == 0)
+            nDecoyWalletSalt = (GetRand(UINT64_MAX - 1)) + 1;
+    }
+
+    {
+        LOCK(cs_decoy);
+        std::vector<uint256> toErase;
+        for (std::map<uint256, std::pair<unsigned int, int> >::const_iterator it = mapDecoyOutputs.begin();
+             it != mapDecoyOutputs.end(); ++it)
+        {
+            int ageBlocks = nHeight - it->second.second;
+            if (ageBlocks > 0 && DecoyShouldRecycle(ageBlocks, level))
+                toErase.push_back(it->first);
+        }
+        for (unsigned int i = 0; i < toErase.size(); i++) {
+            mapDecoyOutputs.erase(toErase[i]);
+            printf("MaybeInjectDecoys: gamma-recycle released tx %s (age %d blk, level=%d)\n",
+                   toErase[i].ToString().substr(0,20).c_str(), nHeight, level);
+        }
+    }
+
+    uint64_t salt;
+    { LOCK(cs_decoy); salt = nDecoyWalletSalt; }
+
+    if (!DecoyShouldInject(blockHash, salt, level))
+        return;
+
+    int nBurst = DecoyBurstCount(blockHash, salt, level);
+    printf("MaybeInjectDecoys: schedule fired — burst=%d, level=%d, height=%d\n",
+           nBurst, level, nHeight);
+
+    for (int i = 0; i < nBurst; i++) {
+        if (!BuildDecoyTransaction()) {
+            printf("MaybeInjectDecoys: burst[%d/%d] aborted (locked/mint-only/balance)\n",
+                   i + 1, nBurst);
+            break;
+        }
+        printf("MaybeInjectDecoys: burst[%d/%d] decoy sent, height=%d, level=%d\n",
+               i + 1, nBurst, nHeight, level);
+    }
 }

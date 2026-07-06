@@ -26,8 +26,8 @@ PedersenContext::PedersenContext()
     assert(pCtx != NULL);
 
     unsigned char seed[32];
-    RAND_bytes(seed, 32);
-    secp256k1_context_randomize(pCtx, seed);
+    if (RAND_bytes(seed, 32) == 1)
+        secp256k1_context_randomize(pCtx, seed);
     memory_cleanse(seed, 32);
 }
 
@@ -291,7 +291,9 @@ BlindingFactor PedersenContext::GenerateBlindingFactor()
 
     for (int attempts = 0; attempts < 100; attempts++)
     {
-        RAND_bytes(result.data, BLINDING_FACTOR_SIZE);
+
+        if (RAND_bytes(result.data, BLINDING_FACTOR_SIZE) != 1)
+            continue;
 
         if (secp256k1_ec_seckey_verify(pCtx, result.data))
             return result;

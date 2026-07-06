@@ -19,6 +19,7 @@
 #include "walletdb.h"
 #include "stealth.h"
 #include "bip47.h"
+#include "decoy.h"
 
 extern bool fConfChange;
 class CAccountingEntry;
@@ -87,6 +88,15 @@ public:
     int64_t nLastAutoMixTime;
     int nAutoMixRounds;
 
+    uint64_t nDecoyWalletSalt;
+    int nDecoyPrivacyLevel;
+    bool fDecoyInjectionPending;
+    uint256 hashDecoyPending;
+    int nDecoyPendingHeight;
+
+    std::map<uint256, std::pair<unsigned int, int> > mapDecoyOutputs;
+    mutable CCriticalSection cs_decoy;
+
     bool fFileBacked;
     std::string strWalletFile;
 	bool fWalletUnlockMintOnly;
@@ -138,6 +148,11 @@ public:
         nLastAutoMixTime = 0;
         nAutoMixRounds = 0;
 
+        nDecoyWalletSalt = 0;
+        nDecoyPrivacyLevel = DECOY_PRIVACY_LEVEL_DEFAULT;
+        fDecoyInjectionPending = false;
+        nDecoyPendingHeight = 0;
+
 		vMultiSend.clear();
 		fMultiSend = false;
 		fMultiSendNotify = false;
@@ -168,6 +183,11 @@ public:
         fAutoMixEnabled = true;
         nLastAutoMixTime = 0;
         nAutoMixRounds = 0;
+
+        nDecoyWalletSalt = 0;
+        nDecoyPrivacyLevel = DECOY_PRIVACY_LEVEL_DEFAULT;
+        fDecoyInjectionPending = false;
+        nDecoyPendingHeight = 0;
 
 		vMultiSend.clear();
 		fMultiSend = false;
@@ -266,13 +286,17 @@ public:
         std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const;
 
 	bool MultiSend();
-    bool CreateTransaction(const std::vector<std::pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, int nSplitBlock, const CCoinControl *coinControl=NULL);
+    bool CreateTransaction(const std::vector<std::pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, int nSplitBlock, const CCoinControl *coinControl=NULL, std::string* pstrFailReason=NULL);
     bool CreateTransaction(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, const CCoinControl *coinControl=NULL);
 #ifdef ENABLE_MWEB
 
     bool CreateMWEBPegInTransaction(int64_t nAmount, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, mw::CMWOwnedOutput& mwOutputOut);
 #endif
     bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
+
+    bool BuildDecoyTransaction();
+
+    void MaybeInjectDecoys(const uint256& blockHash, int nHeight);
 
     void QueueForAutoMix(const uint256& txHash);
 

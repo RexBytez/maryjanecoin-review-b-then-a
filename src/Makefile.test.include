@@ -8,7 +8,8 @@ test_maryjanecoin_SOURCES = \
   test/test_privacy.cpp \
   test/serialize_canonical_tests.cpp \
   test/test_mweb.cpp \
-  test/test_devfund.cpp
+  test/test_devfund.cpp \
+  test/coinjoin_tests.cpp
 
 test_maryjanecoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(srcdir)/test -DENABLE_MWEB
 test_maryjanecoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
