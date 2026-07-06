@@ -1596,9 +1596,14 @@ public:
         vHave.clear();
     }
 
-    bool IsNull()
+    bool IsNull() const
     {
         return vHave.empty();
+    }
+
+    const std::vector<uint256>& GetHave() const
+    {
+        return vHave;
     }
 
     void Set(const CBlockIndex* pindex)

@@ -195,8 +195,8 @@ void CWallet::SetBestChain(const CBlockLocator& loc)
     CWalletDB walletdb(strWalletFile);
     walletdb.WriteBestBlock(loc);
 
-    if (!loc.IsNull() && !loc.vHave.empty()) {
-        const uint256& tipHash = loc.vHave[0];
+    if (!loc.IsNull() && !loc.GetHave().empty()) {
+        const uint256& tipHash = loc.GetHave()[0];
         LOCK(cs_decoy);
         map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(tipHash);
         if (mi != mapBlockIndex.end()) {
@@ -2143,6 +2143,25 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
     }
     if (vecSend.empty() || nValue < 0)
         return false;
+
+    {
+        int nOpReturnCount = 0;
+        BOOST_FOREACH(const PAIRTYPE(CScript, int64_t)& s, vecSend)
+        {
+            if (!s.first.empty() && s.first[0] == OP_RETURN)
+                nOpReturnCount++;
+        }
+        if (nOpReturnCount > 1)
+        {
+            string strReason = strprintf(
+                "CreateTransaction: %d OP_RETURN outputs in vecSend (max 1 per "
+                "IsStandard policy). Combine markers or split into separate TXs.",
+                nOpReturnCount);
+            if (pstrFailReason)
+                *pstrFailReason = strReason;
+            return error("CreateTransaction: %s", strReason.c_str());
+        }
+    }
 
     wtxNew.BindWallet(this);
 
